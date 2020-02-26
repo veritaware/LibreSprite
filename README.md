@@ -1,16 +1,20 @@
 # LibreSprite
 
 *Copyright (C) 2001-2016 David Capello* <br />
-*Copyright (C) 2016-2018 LibreSprite contributors* <br />
+*Copyright (C) 2016-2020 LibreSprite contributors* <br />
+*Copyright (C) 2020-2020 Veritaware group*
 
-## Looking for new maintainers
+## Project summary
 
-This fork of Aseprite (see below) was only started for archiving purposes.
-It was later renamed to LibreSprite to avoid confusion with the proprietary
-Aseprite which is still being developed.
+This is a fork of the [Aseprite](https://www.aseprite.org/)
+application, developed by [David Capello](https://github.com/dacap).
+Aseprite used to be distributed under the [GNU General Public License](LICENSE.txt)
+version 2, but was moved to a proprietary license on
+[August 26th, 2016](https://github.com/aseprite/aseprite/commit/5ecc356a41c8e29977f8608d8826489d24f5fa6c).
 
-There is currently no active developer/maintainer for this project. If you
-are interested in taking over the reins, please make yourself known :)
+This fork was made on the [last commit](https://github.com/aseprite/aseprite/commit/03be4aa23db465219962f4c62410f628e7392545)
+covered by the GPL-2.0+ license, and is now developed independently of the
+proprietary Aseprite.
 
 ## Introduction
 
@@ -29,18 +33,6 @@ Its main features are:
 * [**Multiple editors**](http://www.aseprite.org/docs/workspace/#drag-and-drop-tabs) support.
 * Pixel-art specific tools like filled **Contour**, **Polygon**, [**Shading**](http://www.aseprite.org/docs/shading/) mode, etc.
 * **Onion skinning**
-
-## History
-
-LibreSprite originated as a fork of the [Aseprite](https://www.aseprite.org/)
-application, developed by [David Capello](https://github.com/dacap).
-Aseprite used to be distributed under the [GNU General Public License](LICENSE.txt)
-version 2, but was moved to a proprietary license on
-[August 26th, 2016](https://github.com/aseprite/aseprite/commit/5ecc356a41c8e29977f8608d8826489d24f5fa6c).
-
-This fork was made on the [last commit](https://github.com/aseprite/aseprite/commit/03be4aa23db465219962f4c62410f628e7392545)
-covered by the GPL-2.0+ license, and is now developed independently of the
-proprietary Aseprite.
 
 ## Credits
 
