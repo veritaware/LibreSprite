@@ -4,6 +4,10 @@
 *Copyright (C) 2016-2020 LibreSprite contributors* <br />
 *Copyright (C) 2020-2020 Veritaware group*
 
+## Moved to BitBucket
+
+Development of this project has been moved to [BitBucket](https://bitbucket.org/veritaware/libresprite/src/develop/) for the sake of better Project Management this platform facilitates. GitHub repository is maintained only for releases. Please go to [project site on BitBucket](https://bitbucket.org/account/user/veritaware/projects/LIBSPR) if you'd like to contribute to LibreSprite.
+
 ## Project summary
 
 This is a fork of the [Aseprite](https://www.aseprite.org/)
