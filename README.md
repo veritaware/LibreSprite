@@ -1,7 +1,7 @@
 # LibreSprite
 
-*Copyright (C) 2001-2016 David Capello* <br />
-*Copyright (C) 2016-2020 LibreSprite contributors* <br />
+*Copyright (C) 2001-2016 David Capello*  
+*Copyright (C) 2016-2020 LibreSprite contributors*  
 *Copyright (C) 2020-2020 Veritaware group*
 
 ## Project summary
