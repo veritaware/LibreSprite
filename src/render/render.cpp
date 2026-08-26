@@ -109,12 +109,16 @@ public:
 
 template<>
 class BlenderHelper<IndexedTraits, IndexedTraits> {
+  const Palette* m_pal;
   BlendMode m_blendMode;
+  BlendFunc m_blendFunc;
   color_t m_mask_color;
 public:
   BlenderHelper(const Image* src, const Palette* pal, BlendMode blendMode)
   {
+    m_pal = pal;
     m_blendMode = blendMode;
+    m_blendFunc = RgbTraits::get_blender(blendMode);
     m_mask_color = src->maskColor();
   }
   inline IndexedTraits::pixel_t
@@ -122,15 +126,34 @@ public:
              const IndexedTraits::pixel_t& src,
              int opacity)
   {
-    if (m_blendMode == BlendMode::SRC) {
+    if (m_blendMode == BlendMode::SRC)
       return src;
-    }
-    else {
-      if (src != m_mask_color)
-        return src;
-      else
-        return dst;
-    }
+
+    if (src == m_mask_color)
+      return dst;
+
+    // Normal blending of an indexed image is a plain copy: its pixels are
+    // either fully opaque or the transparent index, so there is nothing to
+    // interpolate and the source index survives untouched.
+    if (m_blendMode == BlendMode::NORMAL || !m_pal || !m_blendFunc)
+      return src;
+
+    // Every other blend mode has to be computed in RGB through the palette
+    // and mapped back to the closest entry. Returning the source index as
+    // Normal blending does would silently drop the layer's blend mode
+    // whenever the destination is an indexed image too, which is exactly
+    // what happens when an indexed sprite is flattened or merged down.
+    const color_t backdrop = (dst == m_mask_color ? rgba(0, 0, 0, 0):
+                                                    m_pal->getEntry(dst));
+    const color_t blended = (*m_blendFunc)(backdrop, m_pal->getEntry(src), opacity);
+    if (rgba_geta(blended) == 0)
+      return m_mask_color;
+
+    return m_pal->findBestfit(rgba_getr(blended),
+                              rgba_getg(blended),
+                              rgba_getb(blended),
+                              rgba_geta(blended),
+                              m_mask_color);
   }
 };
 
