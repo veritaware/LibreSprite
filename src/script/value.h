@@ -1,5 +1,6 @@
 // LibreSprite Scripting Library
-// Copyright (c) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
+// Besprited   | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -318,6 +319,11 @@ namespace script {
     }
 
 // MAP
+    // When `own` is true, `ptr` must have been allocated with
+    // `new Map::data_t[1]`, not a plain `new Map::data_t`: RefCount::release()
+    // (shared with Buffer, whose bytes really are array-allocated) always
+    // frees via delete[], so a singly-allocated map would corrupt the heap
+    // when the last reference is released.
     Value(Map::data_t* ptr, bool own) {
       type = Type::MAP;
       data.map_v = new Map {ptr, own};

@@ -1,5 +1,6 @@
 // LibreSprite Scripting Library
-// Copyright (c) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
+// Besprited   | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -81,25 +82,33 @@ namespace script {
   class ScriptObject : public Injectable<ScriptObject> {
     friend class Engine;
     Handle m_handle;
-    bool m_own;
+    bool m_own = false;
 
   public:
     #if _DEBUG
     static inline std::size_t count{};
+    #endif
 
     ScriptObject() {
+      #if _DEBUG
       count++;
       std::cout << "+Object count: " << count << std::endl;
+      #endif
     }
 
+    // Disposing an owned handle must not be a debug-only side effect: it's
+    // the only thing that ever deletes the native object behind an "owned"
+    // ScriptObject (see setWrapped()/create()), in every build configuration
+    // - not just when _DEBUG happens to be defined.
     ~ScriptObject() {
+      #if _DEBUG
       count--;
       std::cout << "-Object count: " << count << std::endl;
+      #endif
       if (m_own) {
         m_handle.dispose();
       }
     }
-    #endif
 
     template <typename Base, typename Cast = Base>
     Cast* handle() {return m_handle.get<Base, Cast>();}

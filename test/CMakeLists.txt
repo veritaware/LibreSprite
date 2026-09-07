@@ -54,13 +54,20 @@ function(find_tests dir)
     set(entrypoint GTest::gtest)
   endif()
 
-  # app-lib relies on static initializers (the FileFormat / command injection
-  # registry) that a normal static link would drop - pull the whole archive in.
+  # app-lib and script-lib both rely on static initializers (the FileFormat /
+  # command injection registry, and the Engine / InternalScriptObject / qjs
+  # EngineDelegate registrations respectively) that a normal static link
+  # would drop - a test that never calls a function from e.g.
+  # quickjs/engine.cpp.o gives the linker no reason to pull that object file
+  # out of the archive at all, silently dropping its registrations. Pull the
+  # whole archive in for any such lib this suite links against.
   set(prelibs "")
-  if("app-lib" IN_LIST deps)
-    list(REMOVE_ITEM deps app-lib)
-    set(prelibs "$<LINK_LIBRARY:WHOLE_ARCHIVE,app-lib>")
-  endif()
+  foreach(wholeArchiveLib app-lib script-lib)
+    if("${wholeArchiveLib}" IN_LIST deps)
+      list(REMOVE_ITEM deps ${wholeArchiveLib})
+      list(APPEND prelibs "$<LINK_LIBRARY:WHOLE_ARCHIVE,${wholeArchiveLib}>")
+    endif()
+  endforeach()
 
   # The module libraries have interdependencies that are not all expressed as
   # transitive link deps, so let the linker rescan the whole set.
@@ -130,11 +137,13 @@ set(MODULE_TEST_LIBS
   ${ZLIB_LIBRARIES}
   ${FREETYPE_LIBRARIES})
 
-# base / gfx / css do not touch the she layer - keep these lean and let
-# GTest::gtest_main own the entry point.
+# base / gfx / css / script do not touch the she layer - keep these lean and
+# let GTest::gtest_main own the entry point. script-lib pulls in qjs (and
+# base-lib for base/convert_to.cpp & friends) transitively.
 find_tests(base   base-lib)
 find_tests(gfx    gfx-lib)
 find_tests(css    css-lib)
+find_tests(script script-lib base-lib)
 
 # doc / render / ui / app all reach the she layer (see MODULE_TEST_LIBS).
 find_tests(doc      ${MODULE_TEST_LIBS})
