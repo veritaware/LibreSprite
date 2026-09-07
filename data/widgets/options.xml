@@ -75,8 +75,7 @@
         <!-- Editor -->
         <vbox id="section_editor">
           <separator text="Editor" horizontal="true" />
-          <check text="Zoom with scroll wheel" id="wheel_zoom" />
-          <check text="Zoom sliding two fingers up or down" id="slide_zoom" />
+          <check text="Zoom with scroll wheel" id="wheel_zoom" tooltip="When checked, the scroll wheel zooms the sprite&#10;and Ctrl+wheel pans it. Uncheck to swap this&#10;(wheel pans, Ctrl+wheel zooms). Two-finger&#10;trackpad swipes always pan, and pinch always&#10;zooms (Ctrl+pinch snaps to integer zoom levels)." />
           <check text="Zoom from center with scroll wheel" id="zoom_from_center_with_wheel" />
           <check text="Zoom from center with keys" id="zoom_from_center_with_keys" />
           <check text="Invert horizontal scroll" id="invert_horizontal_scroll" />

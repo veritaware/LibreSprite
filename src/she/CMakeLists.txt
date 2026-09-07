@@ -41,6 +41,14 @@ if(APPLE)
     osx/logger.mm
     osx/native_dialogs.mm
     osx/tablet.mm)
+
+  # The native (non-SDL2) osx backend already handles pinch/magnify
+  # gestures directly in osx/view.mm; SDL2's Cocoa backend does not
+  # forward them at all, so it needs its own hook.
+  if(USE_SDL2_BACKEND)
+    list(APPEND SHE_SOURCES
+      osx/magnify_gesture.mm)
+  endif()
 endif()
 
 if(WITH_GTK_FILE_DIALOG_SUPPORT AND UNIX AND NOT APPLE AND NOT BEOS)

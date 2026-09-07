@@ -497,10 +497,29 @@ namespace she {
           penPressure = std::max<>(sdlEvent.tfinger.pressure, 0.0001f);
           continue;
 
-        case SDL_MOUSEWHEEL:
+        case SDL_MOUSEWHEEL: {
           event.setType(Event::MouseWheel);
           event.setModifiers(getSheModifiers());
           event.setWheelDelta({-sdlEvent.wheel.x, -sdlEvent.wheel.y});
+
+          bool isPrecise = false;
+#ifdef __APPLE__
+          // Virtually all scroll input on macOS comes from a trackpad,
+          // and pinch (handled separately as a TouchMagnify event) is
+          // the dedicated zoom gesture, so always treat wheel events
+          // here as a free-panning swipe.
+          isPrecise = true;
+#elif SDL_VERSION_ATLEAST(2, 0, 18)
+          // A trackpad/precision touchpad reports sub-notch deltas in
+          // preciseX/preciseY; a regular wheel notch reports the same
+          // (rounded) value in both the integer and precise fields.
+          isPrecise = (sdlEvent.wheel.preciseX != (float)sdlEvent.wheel.x) ||
+                      (sdlEvent.wheel.preciseY != (float)sdlEvent.wheel.y);
+#endif
+          event.setPreciseWheel(isPrecise);
+          if (isPrecise)
+            event.setPointerType(PointerType::Multitouch);
+
           int x, y;
           SDL_GetMouseState(&x, &y);
           event.setPosition({
@@ -508,6 +527,7 @@ namespace she {
               y / unique_display->scale()
             });
           return;
+        }
 
         case SDL_MOUSEBUTTONUP:
         case SDL_MOUSEBUTTONDOWN: {

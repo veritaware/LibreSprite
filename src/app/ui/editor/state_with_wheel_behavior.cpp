@@ -12,7 +12,6 @@
 #include "app/ui/editor/state_with_wheel_behavior.h"
 
 #include "app/app.h"
-#include "app/commands/commands.h"
 #include "app/modules/palettes.h"
 #include "app/pref/preferences.h"
 #include "app/ui/color_bar.h"
@@ -31,15 +30,13 @@ enum WHEEL_ACTION { WHEEL_NONE,
                     WHEEL_VSCROLL,
                     WHEEL_HSCROLL,
                     WHEEL_FG,
-                    WHEEL_BG,
-                    WHEEL_FRAME };
+                    WHEEL_BG };
 
 bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
 {
   gfx::Point delta = msg->wheelDelta();
   double dz = delta.x + delta.y;
   WHEEL_ACTION wheelAction = WHEEL_NONE;
-  bool scrollBigSteps = false;
 
   // Alt+mouse wheel changes the fg/bg colors
   if (msg->altPressed()) {
@@ -48,41 +45,32 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
     else
       wheelAction = WHEEL_FG;
   }
-  // Normal behavior: mouse wheel zooms If the message is from a
-  // precise wheel i.e. a trackpad/touch-like device, we scroll by
-  // default.
-  else if (Preferences::instance().editor.zoomWithWheel() && !msg->preciseWheel()) {
-    if (msg->ctrlPressed())
-      wheelAction = WHEEL_FRAME;
-    else if (delta.x != 0 || msg->shiftPressed())
-      wheelAction = WHEEL_HSCROLL;
-    else
-      wheelAction = WHEEL_ZOOM;
+  // A precise wheel comes from a touchpad/trackpad two-finger swipe:
+  // it always freely pans the viewport on both axes (following the
+  // physical swipe direction), it never zooms.
+  else if (msg->preciseWheel()) {
+    View* view = View::getView(editor);
+    gfx::Point scroll = view->viewScroll();
+
+    if (Preferences::instance().editor.invertHorizontalScroll())
+      delta.x = -delta.x;
+    if (Preferences::instance().editor.invertVerticalScroll())
+      delta.y = -delta.y;
+
+    editor->setEditorScroll(scroll+delta);
+    return true;
   }
-  // Zoom sliding two fingers
-  else if (Preferences::instance().editor.zoomWithSlide() && msg->preciseWheel()) {
-    if (msg->ctrlPressed())
-      wheelAction = WHEEL_FRAME;
-    else if (std::abs(delta.x) > std::abs(delta.y)) {
-      delta.y = 0;
-      dz = delta.x;
-      wheelAction = WHEEL_HSCROLL;
-    }
-    else if (msg->shiftPressed()) {
-      delta.x = 0;
-      dz = delta.y;
-      wheelAction = WHEEL_VSCROLL;
-    }
-    else {
-      delta.x = 0;
-      dz = delta.y;
-      wheelAction = WHEEL_ZOOM;
-    }
-  }
-  // For laptops, it's convenient to that Ctrl+wheel zoom (because
-  // it's the "pinch" gesture).
+  // Regular wheel notches (mouse wheel or a trackpad reporting
+  // itself as a mouse): vertical and horizontal movement get the
+  // same treatment, either both pan or both zoom. Ctrl toggles
+  // between the two modes configured by "Zoom with scroll wheel"
+  // (the same modifier used for the pinch gesture in onTouchMagnify).
   else {
+    bool zoomMode = Preferences::instance().editor.zoomWithWheel();
     if (msg->ctrlPressed())
+      zoomMode = !zoomMode;
+
+    if (zoomMode)
       wheelAction = WHEEL_ZOOM;
     else if (delta.x != 0 || msg->shiftPressed())
       wheelAction = WHEEL_HSCROLL;
@@ -114,27 +102,9 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
       }
       break;
 
-    case WHEEL_FRAME:
-      {
-        Command* command = CommandsModule::instance()->getCommandByName
-          ((dz < 0.0) ? CommandId::GotoNextFrame:
-                        CommandId::GotoPreviousFrame);
-        if (command)
-          UIContext::instance()->executeCommand(command);
-      }
-      break;
-
     case WHEEL_ZOOM: {
       render::Zoom zoom = editor->zoom();
-
-      if (msg->preciseWheel()) {
-        dz /= 1.5;
-        if (dz < -1.0) dz = -1.0;
-        else if (dz > 1.0) dz = 1.0;
-      }
-
       zoom = render::Zoom::fromLinearScale(zoom.linearScale() - int(dz));
-
       setZoom(editor, zoom, msg->position());
       break;
     }
@@ -143,23 +113,15 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
     case WHEEL_VSCROLL: {
       View* view = View::getView(editor);
       gfx::Point scroll = view->viewScroll();
+      gfx::Rect vp = view->viewportBounds();
 
-      if (!msg->preciseWheel()) {
-        gfx::Rect vp = view->viewportBounds();
-
-        if (wheelAction == WHEEL_HSCROLL) {
-          delta.x = int(dz * vp.w);
-        }
-        else {
-          delta.y = int(dz * vp.h);
-        }
-
-        if (scrollBigSteps) {
-          delta /= 2;
-        }
-        else {
-          delta /= 10;
-        }
+      if (wheelAction == WHEEL_HSCROLL) {
+        delta.x = int(dz * vp.w) / 10;
+        delta.y = 0;
+      }
+      else {
+        delta.y = int(dz * vp.h) / 10;
+        delta.x = 0;
       }
 
       if (Preferences::instance().editor.invertHorizontalScroll()) {
@@ -181,10 +143,15 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
 bool StateWithWheelBehavior::onTouchMagnify(Editor* editor, ui::TouchMessage* msg)
 {
   render::Zoom zoom = editor->zoom();
-  zoom = render::Zoom::fromScale(
+  render::Zoom newZoom = render::Zoom::fromScale(
     zoom.internalScale() + zoom.internalScale() * msg->magnification());
 
-  setZoom(editor, zoom, msg->position());
+  // Ctrl+pinch snaps to the closest integer zoom level instead of
+  // zooming freely.
+  if (msg->ctrlPressed())
+    newZoom = render::Zoom::fromLinearScale(newZoom.linearScale());
+
+  setZoom(editor, newZoom, msg->position());
   return true;
 }
 

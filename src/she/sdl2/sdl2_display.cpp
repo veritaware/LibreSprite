@@ -1,5 +1,6 @@
 // SHE library
 // Copyright (C) 2021 LibreSprite contributors
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -40,6 +41,9 @@
 #if __APPLE__
 namespace osx_tablet {
   int init();
+}
+namespace osx_magnify {
+  bool init(SDL_Window* window);
 }
 #endif
 
@@ -115,6 +119,8 @@ namespace she {
 #endif
 #elif __APPLE__
       tabletSupport = osx_tablet::init();
+      bool magnifySupport = osx_magnify::init(m_window);
+      std::cout << "Magnify gesture support: " << (magnifySupport ? "OK" : "FAILED") << std::endl;
 #endif
       std::cout << "Tablet support: " << (tabletSupport ? "OK" : "FAILED") << std::endl;
     }, true);
