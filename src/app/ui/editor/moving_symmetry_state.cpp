@@ -1,5 +1,5 @@
 // Aseprite    | Copyright (C) 2015 David Capello
-// LibreSprite | Copyright (C) 2021-2026 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
 // Besprited   | Copyright (C) 2026 Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
