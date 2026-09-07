@@ -1,11 +1,13 @@
 // Aseprite Render Library
 // Copyright (c) 2001-2015 David Capello
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
 #pragma once
 
+#include "base/base.h"
 #include "doc/color.h"
 #include "doc/image_impl.h"
 #include "doc/palette.h"

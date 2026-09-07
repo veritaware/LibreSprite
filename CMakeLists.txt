@@ -335,6 +335,13 @@ add_subdirectory(src)
 add_subdirectory(third_party)
 
 ######################################################################
+# Unit tests
+
+if(ENABLE_TESTS)
+  add_subdirectory(test)
+endif()
+
+######################################################################
 # Static code analysis targets
 
 # cppcheck target
