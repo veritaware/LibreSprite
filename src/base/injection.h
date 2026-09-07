@@ -1,6 +1,6 @@
-// Aseprite Base Library
-// LibreSprite | Copyright (C) 2021       LibreSprite contributors
-// Besprited   | Copyright (C) 2026       Veritaware
+// Base Library
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
+// Besprited   | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
