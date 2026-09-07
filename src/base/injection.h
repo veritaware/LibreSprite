@@ -1,5 +1,6 @@
 // Aseprite Base Library
-// Copyright (c) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021       LibreSprite contributors
+// Besprited   | Copyright (C) 2026       Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -188,10 +189,10 @@ public:
     std::swap(onDetach, other.onDetach);
   }
 
-  BaseClass* operator -> () {return m_ptr;}
-  BaseClass& operator * () {return *m_ptr;}
-  operator bool () {return m_ptr;}
-  operator BaseClass* () {return m_ptr;}
+  BaseClass* operator -> () const {return m_ptr;}
+  BaseClass& operator * () const {return *m_ptr;}
+  operator bool () const {return m_ptr;}
+  operator BaseClass* () const {return m_ptr;}
 
   template<typename Derived = BaseClass>
   Derived* get() const {return dynamic_cast<Derived*>(m_ptr);}
