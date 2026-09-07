@@ -1,5 +1,5 @@
 # Aseprite    | Copyright (C) 2001-2016 David Capello
-# LibreSprite | Copyright (C) 2021      LibreSprite contributors
+# LibreSprite | Copyright (C) 2021-2026 LibreSprite contributors
 # Besprited   | Copyright (C) 2026      Veritaware
 
 # Generate a ui::Widget for each widget in a XML file
