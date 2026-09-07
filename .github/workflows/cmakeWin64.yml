@@ -79,9 +79,10 @@ jobs:
     - name: Build the binaries
       shell: msys2 {0}
       run: |
-        make -C build -j 4
-        # Keep only the editor executable - drop gen.exe, qjs/qjsc, *_tests, etc.
-        # so they never end up in the portable ZIP or the installer.
+        make -C build besprited -j 4
+        # Building only the 'besprited' target already keeps gen.exe, qjs/qjsc
+        # and the *_tests binaries out of build/bin; this is a defensive sweep so
+        # nothing but the editor can end up in the portable ZIP or the installer.
         find build/bin -maxdepth 1 -type f -name '*.exe' ! -name 'besprited.exe' -delete
         node packaging/package_win.js build/bin/besprited.exe
     - name: Upload portable archive

@@ -46,11 +46,12 @@ cmake --build . --target clang-tidy  # requires clang-tidy
 
 ### Tests
 
-Tests use GoogleTest (vendored under `third_party/gtest`) and must be enabled via `-DENABLE_TESTS=on` at
-configure time. Test discovery is automatic: any `*_tests.cpp` file inside a module's source directory
-(and a few explicitly-listed directories: `eval`, `base`, `gfx`, `doc`, `render`, `css`, `ui`,
-`app/file`, `app`, and the top-level `src/`) becomes its own standalone test executable and CTest entry —
-see `cmake/FindTests.cmake` and the `find_tests(...)` calls at the bottom of `src/CMakeLists.txt`.
+Unit tests live in the top-level `test/` directory (mirroring the `src/` module layout) and must be
+enabled via `-DENABLE_TESTS=on` at configure time. They use GoogleTest, provided by `test/CMakeLists.txt`
+via `FetchContent` — a system-installed GTest is used when available, otherwise a pinned copy is fetched
+at configure time (no submodule). Test discovery is automatic: any `*_tests.cpp` file inside a module's
+`test/<module>/` directory (`base`, `gfx`, `doc`, `render`, `css`, `ui`, `app/file`, `app`) becomes its
+own standalone test executable and CTest entry — see the `find_tests(...)` calls in `test/CMakeLists.txt`.
 
 ```
 ninja                 # builds all *_tests executables too
@@ -59,9 +60,9 @@ ctest -R <test_name>  # run a single test executable (name == the *_tests.cpp ba
 ./bin/some_tests       # or run the built test binary directly
 ```
 
-A few modules (`src/clip`, `src/undo`, and the vendored `third_party/observable`) have their own
-self-contained `tests/CMakeLists.txt` with a local `add_<module>_test()` helper instead of using
-`find_tests`.
+A few modules (`src/clip`, `src/undo`, and the vendored `third_party/observable`) keep their own
+self-contained `tests/CMakeLists.txt` (with a local `add_<module>_test()` helper and a tiny in-tree
+test header) rather than the GoogleTest suite under `test/`.
 
 ## Architecture
 

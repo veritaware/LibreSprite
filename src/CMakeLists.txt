@@ -164,20 +164,5 @@ add_dependencies(besprited copy_data)
 # Add libresprite as an alias target for backward compatibility
 add_custom_target(libresprite DEPENDS besprited)
 
-######################################################################
-# Tests
-
-if(ENABLE_TESTS)
-  include(FindTests)
-
-  find_tests(eval evalmath-lib)
-  find_tests(base base-lib)
-  find_tests(gfx gfx-lib)
-  find_tests(doc doc-lib)
-  find_tests(render render-lib)
-  find_tests(css css-lib)
-  find_tests(ui ui-lib)
-  find_tests(app/file app-lib)
-  find_tests(app app-lib)
-  find_tests(. app-lib)
-endif()
+# Unit tests live in the top-level test/ directory (see test/CMakeLists.txt),
+# wired in from the root CMakeLists.txt.
