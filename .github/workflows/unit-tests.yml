@@ -1,0 +1,26 @@
+name: Unit Tests
+
+on:
+  pull_request:
+    branches: [ trunk ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-unit-tests:
+    name: build unit tests
+    runs-on: ubuntu-26.04
+    if: ${{ !contains(github.event.pull_request.body, 'NO_SW_CHANGE') }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        submodules: 'true'
+    - name: Install build dependencies
+      uses: ./.github/actions/install-deps
+    - name: Configure with tests enabled
+      run: cmake -S . -B build -G Ninja -DENABLE_TESTS=on
+    - name: Build the unit tests
+      run: cmake --build build
+    - name: Run the unit tests
+      run: ctest --test-dir build --output-on-failure

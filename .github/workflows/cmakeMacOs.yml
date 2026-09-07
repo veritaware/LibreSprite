@@ -80,8 +80,10 @@ jobs:
         fi
     - name: Build the binaries
       run: |
-        cmake --build build -j 3
-        rm -f build/bin/clip_image_tests build/bin/clip_text_tests build/bin/clip_user_format_tests build/bin/gen
+        # Build only the editor target so test/tool binaries (clip_*_tests,
+        # gen, qjs*) are never produced and can't leak into the bundle.
+        cmake --build build -j 3 --target besprited
+        rm -f build/bin/gen
     - name: Generate .icns file
       run: |
         mkdir besprited.iconset
@@ -253,8 +255,10 @@ jobs:
         fi
     - name: Build the binaries
       run: |
-        cmake --build build -j 3
-        rm -f build/bin/clip_image_tests build/bin/clip_text_tests build/bin/clip_user_format_tests build/bin/gen
+        # Build only the editor target so test/tool binaries (clip_*_tests,
+        # gen, qjs*) are never produced and can't leak into the bundle.
+        cmake --build build -j 3 --target besprited
+        rm -f build/bin/gen
     - name: Generate .icns file
       run: |
         mkdir besprited.iconset
