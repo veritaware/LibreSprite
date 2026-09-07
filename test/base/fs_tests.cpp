@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "base/fs.h"
+#include "base/path.h"
 
 using namespace base;
 
@@ -42,6 +43,63 @@ TEST(FileSystem, MakeAllDirectories)
 
   remove_directory("a");
   EXPECT_FALSE(is_directory("a"));
+}
+
+TEST(FileSystem, ListFilesOnAnEmptyDirectory)
+{
+  make_directory("list_a");
+  auto files = list_files("list_a");
+  EXPECT_TRUE(files.empty());
+  remove_directory("list_a");
+}
+
+TEST(FileSystem, ListFilesExcludesDotAndDotDot)
+{
+  make_all_directories("list_b/child");
+  auto files = list_files("list_b");
+
+  ASSERT_EQ(1u, files.size());
+  EXPECT_EQ("child", files[0]);
+  for (auto& name : files) {
+    EXPECT_NE(".", name);
+    EXPECT_NE("..", name);
+  }
+
+  remove_directory("list_b/child");
+  remove_directory("list_b");
+}
+
+TEST(FileSystem, ListFilesOnAMissingDirectoryReturnsEmpty)
+{
+  EXPECT_FALSE(is_directory("does_not_exist_dir"));
+  auto files = list_files("does_not_exist_dir");
+  EXPECT_TRUE(files.empty());
+}
+
+TEST(FileSystem, GetCanonicalPathResolvesTheCurrentDirectory)
+{
+  make_directory("canon_dir");
+
+  auto canonical = get_canonical_path("canon_dir");
+
+  // Must be turned into an absolute path.
+  EXPECT_TRUE(is_path_separator(canonical.front()) ||
+              (canonical.size() > 1 && canonical[1] == ':'));
+  EXPECT_TRUE(is_directory(canonical));
+
+  remove_directory("canon_dir");
+}
+
+TEST(FileSystem, GetCanonicalPathOnAMissingPathReturnsItUnchanged)
+{
+  std::string missing = "this_path_does_not_exist_at_all";
+  EXPECT_EQ(missing, get_canonical_path(missing));
+}
+
+TEST(FileSystem, GetFontPathsIsNonEmpty)
+{
+  auto paths = get_font_paths();
+  EXPECT_FALSE(paths.empty());
 }
 
 int main(int argc, char** argv)
