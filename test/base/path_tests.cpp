@@ -148,6 +148,29 @@ TEST(Path, CompareFilenames)
   EXPECT_EQ(1, compare_filenames("a1-64-10.png", "a1-64-9.png"));
 }
 
+TEST(Path, VerifyFilename)
+{
+  // verify_filename() only rejects characters on Windows (where _wfopen()
+  // would choke on them); elsewhere every filename is accepted.
+#ifdef _WIN32
+  EXPECT_EQ(std::string::npos, verify_filename("normal_name.png"));
+  EXPECT_EQ(0u, verify_filename(":bad"));
+  EXPECT_EQ(1u, verify_filename("a?bad"));
+  EXPECT_EQ(1u, verify_filename("a\"bad"));
+  EXPECT_EQ(1u, verify_filename("a<bad"));
+  EXPECT_EQ(1u, verify_filename("a>bad"));
+  EXPECT_EQ(1u, verify_filename("a|bad"));
+  EXPECT_EQ(1u, verify_filename("a*bad"));
+  // Slashes and backslashes are intentionally left to _wfopen() itself.
+  EXPECT_EQ(std::string::npos, verify_filename("a/b\\c"));
+  EXPECT_EQ(std::string::npos, verify_filename(""));
+#else
+  EXPECT_EQ(std::string::npos, verify_filename("normal_name.png"));
+  EXPECT_EQ(std::string::npos, verify_filename(":bad?name<with>weird|chars*"));
+  EXPECT_EQ(std::string::npos, verify_filename(""));
+#endif
+}
+
 int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);

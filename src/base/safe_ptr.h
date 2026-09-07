@@ -1,5 +1,5 @@
-// LibreSprite
-// Copyright (C) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021       LibreSprite contributors
+// Besprited   | Copyright (C) 2026       Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -90,8 +90,21 @@ namespace base {
       return **storage;
     }
 
-    template<typename T>
+    // Only participates in overload resolution for scalar targets (bool,
+    // other pointer types, integers, enums...). Without this constraint the
+    // operator is a universal implicit conversion candidate for *any* class
+    // type T, which some SFINAE-heavy code (e.g. GoogleTest's
+    // AssertionResult, whose constructors probe std::is_convertible<...,
+    // AssertionResult> while overload-resolving an implicit bool
+    // conversion) ends up instantiating in ways that are unrelated to the
+    // caller's intent and unsafe to evaluate eagerly.
+    template<typename T,
+             typename std::enable_if<std::is_scalar<T>::value, int>::type = 0>
     operator T () const {
+      // Guard against dereferencing empty/expired storage, same as
+      // operator bool() above.
+      if (!storage || !*storage)
+        return T{};
       return static_cast<T>(*storage);
     }
 
@@ -130,7 +143,13 @@ namespace base {
 
   template<typename Type>
   void saveSafePtr(Type* raw, safe_ptr<Type> safe) {
-    detail::getSafePtrIndex<Type>().emplace(raw, safe);
+    // Overwrite, don't emplace: a dead entry can still be sitting at `raw`
+    // if the heap reused a previously make_safe()'d object's address
+    // before a purgeSafePtrs() ran. emplace() would silently keep that
+    // stale (dead) entry instead of registering the new, live object.
+    // insert_or_assign() (rather than operator[]) avoids requiring
+    // safe_ptr<Type> to be default-constructible, which it isn't.
+    detail::getSafePtrIndex<Type>().insert_or_assign(raw, safe);
   }
 
   template<typename Type>
