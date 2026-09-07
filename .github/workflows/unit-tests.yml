@@ -23,4 +23,10 @@ jobs:
     - name: Build the unit tests
       run: cmake --build build
     - name: Run the unit tests
+      # she's platform main() (which owns the entry point of the she-linked test
+      # binaries) calls SDL_Init(SDL_INIT_VIDEO); the dummy driver keeps that
+      # working on a headless runner.
+      env:
+        SDL_VIDEODRIVER: dummy
+        SDL_AUDIODRIVER: dummy
       run: ctest --test-dir build --output-on-failure

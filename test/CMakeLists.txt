@@ -42,9 +42,17 @@ function(find_tests dir)
   file(GLOB testsources CONFIGURE_DEPENDS
        "${CMAKE_CURRENT_SOURCE_DIR}/${dir}/*_tests.cpp")
 
-  # Tests linked with "she" get its platform main(); tests.h then renames the
-  # test's own entry point to app_main() so she can call it.
+  # base/log.cpp calls she::log(), which lives in the same translation unit as
+  # she's platform main(). So any test that links both base and she pulls in
+  # she's main() - such tests must define app_main() instead (via tests.h with
+  # -DLINKED_WITH_SHE) and let she's main() call it, and must NOT also link
+  # GTest::gtest_main.
   list(FIND deps she _linked_with_she)
+  if(_linked_with_she EQUAL -1)
+    set(entrypoint GTest::gtest_main)
+  else()
+    set(entrypoint GTest::gtest)
+  endif()
 
   # app-lib relies on static initializers (the FileFormat / command injection
   # registry) that a normal static link would drop - pull the whole archive in.
@@ -78,7 +86,7 @@ function(find_tests dir)
     endif()
 
     target_link_libraries(${testname} PRIVATE
-      GTest::gtest_main ${prelibs} ${deps} ${PLATFORM_LIBS})
+      ${entrypoint} ${prelibs} ${deps} ${PLATFORM_LIBS})
 
     if(MSVC)
       # Fix problem compiling gen from a Visual Studio solution
@@ -92,8 +100,10 @@ endfunction()
 # Module test suites
 
 # app-lib has no transitive link dependencies of its own (the besprited target
-# lists them explicitly), so app tests need the full module set spelled out.
-set(APP_TEST_LIBS
+# lists them explicitly), and doc-lib / render-lib / ui-lib all pull in "she"
+# (whose main() then owns the entry point), so every test suite that touches
+# that layer links the full module set.
+set(MODULE_TEST_LIBS
   app-lib
   evalmath
   base-lib
@@ -120,12 +130,15 @@ set(APP_TEST_LIBS
   ${ZLIB_LIBRARIES}
   ${FREETYPE_LIBRARIES})
 
+# base / gfx / css do not touch the she layer - keep these lean and let
+# GTest::gtest_main own the entry point.
 find_tests(base   base-lib)
 find_tests(gfx    gfx-lib)
-find_tests(doc    doc-lib)
-find_tests(render render-lib)
 find_tests(css    css-lib)
-# ui-lib calls back into app (app::i18n), so ui tests need the full set too.
-find_tests(ui     ${APP_TEST_LIBS})
-find_tests(app/file ${APP_TEST_LIBS})
-find_tests(app    ${APP_TEST_LIBS})
+
+# doc / render / ui / app all reach the she layer (see MODULE_TEST_LIBS).
+find_tests(doc      ${MODULE_TEST_LIBS})
+find_tests(render   ${MODULE_TEST_LIBS})
+find_tests(ui       ${MODULE_TEST_LIBS})
+find_tests(app/file ${MODULE_TEST_LIBS})
+find_tests(app      ${MODULE_TEST_LIBS})

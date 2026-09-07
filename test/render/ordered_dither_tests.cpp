@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "render/ordered_dither.h"
 
@@ -56,10 +56,4 @@ TEST(BayerMatrix, CheckD8)
   };
   for (int i=0; i<2*2; ++i)
     EXPECT_EQ(expected[i], matrix[i]);
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

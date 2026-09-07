@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "doc/algorithm/resize_image.h"
 #include "doc/color.h"
@@ -94,9 +94,3 @@ TEST(ResizeImage, BilinearInterpRGBType)
   ASSERT_EQ(0, count_diff_between_images(dst, dst_expected));
 }
 #endif
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

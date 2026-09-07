@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "doc/image_impl.h"
 #include "doc/primitives.h"
@@ -215,10 +215,4 @@ TYPED_TEST(ImageAllTypes, FillRect)
       }
     }
   }
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

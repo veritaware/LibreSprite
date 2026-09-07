@@ -8,7 +8,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "doc/blend_funcs.h"
 #include "doc/blend_mode.h"
@@ -106,10 +106,4 @@ TEST(BlendFuncs, GrayaSpecialModesStillBlendOverOpaqueBackdrop)
   color_t normalResult = graya_blender_normal(backdrop, src, 255);
   color_t multiplyResult = multiply(backdrop, src, 255);
   EXPECT_NE(normalResult, multiplyResult);
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

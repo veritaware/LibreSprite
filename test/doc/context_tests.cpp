@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "doc/context.h"
 #include "doc/document.h"
@@ -86,10 +86,4 @@ TEST(Context, SwitchContext)
   ctx2.documents().add(doc2);
   EXPECT_EQ(&ctx1, doc1->context());
   EXPECT_EQ(&ctx2, doc2->context());
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

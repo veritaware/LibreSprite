@@ -10,7 +10,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "render/render.h"
 
@@ -221,10 +221,4 @@ TEST(Render, ZoomAndDstBounds)
     0, 1, 2, 0,
     0, 2, 4, 0,
     0, 0, 0, 0);
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

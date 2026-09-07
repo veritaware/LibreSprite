@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#include <gtest/gtest.h>
+#include "tests.h"
 
 #include "doc/cel.h"
 #include "doc/cels_range.h"
@@ -102,10 +102,4 @@ TEST(Sprite, CelsRange)
     ++i;
   }
   EXPECT_EQ(2, i);
-}
-
-int main(int argc, char** argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }
