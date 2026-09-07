@@ -1,6 +1,6 @@
 // Aseprite Document Library
-// Besprited | Copyright (C) 2026 Veritaware
-// Copyright (c) 2001-2014 David Capello
+// Aseprite  | Copyright (C) 2001-2014 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -21,7 +21,7 @@ namespace doc {
   std::ostream& operator<<(std::ostream& os, ColorMode mode) {
     return os << (int)mode;
   }
-  
+
 } // namespace doc
 
 TEST(Context, AddDocument)

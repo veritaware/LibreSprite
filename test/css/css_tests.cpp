@@ -1,6 +1,6 @@
 // Aseprite CSS Library
+// Aseprite  | Copyright (C) 2013 David Capello
 // Besprited | Copyright (C) 2026 Veritaware
-// Copyright (C) 2013 David Capello
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -25,7 +25,7 @@ namespace css {
     os << ")";
     return os;
   }
-  
+
 } // namespace css
 
 TEST(Css, Style)
