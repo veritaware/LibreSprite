@@ -1,5 +1,5 @@
-// Aseprite
-// Copyright (C) 2001-2016  David Capello
+// Aseprite  | Copyright (C) 2001-2016 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -30,6 +30,7 @@
 #include "app/ui/skin/skin_style_property.h"
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui/status_bar.h"
+#include "app/ui/status_bar_text.h"
 #include "app/ui/timeline.h"
 #include "app/ui/toolbar.h"
 #include "app/ui/zoom_entry.h"
@@ -265,6 +266,41 @@ private:
   std::vector<Indicator*>::iterator m_iterator;
 };
 
+std::vector<StatusBarTextToken> tokenizeStatusBarText(const std::string& text)
+{
+  std::vector<StatusBarTextToken> tokens;
+  const char* start = text.c_str();
+
+  for (auto i = start; *i; ) {
+    // Icon
+    if (*i == ':' && (i == start || *(i-1) == ' ')) {
+      const char* j = i+1;
+      for (; *j; ++j) {
+        if (*j == ':')
+          break;
+      }
+
+      if (*j && (*(j+1) == 0 || *(j+1) == ' ')) {
+        if (i != start) {
+          // Here i is ':' and i-1 is a whitespace ' '
+          tokens.push_back({StatusBarTextToken::Kind::Text, std::string(start, i-1)});
+        }
+
+        tokens.push_back({StatusBarTextToken::Kind::Icon, std::string(i+1, j)});
+
+        start = i = (*(j+1) == ' ' ? j+2 : j+1);
+        continue;
+      }
+    }
+    ++i;
+  }
+
+  if (*start != 0)
+    tokens.push_back({StatusBarTextToken::Kind::Text, std::string(start)});
+
+  return tokens;
+}
+
 class StatusBar::IndicatorsGeneration {
 public:
   IndicatorsGeneration(StatusBar::Indicators* indicators)
@@ -279,34 +315,16 @@ public:
   IndicatorsGeneration& add(const char* text) {
     auto theme = SkinTheme::instance();
 
-    for (auto i = text; *i; ) {
-      // Icon
-      if (*i == ':' && (i == text || *(i-1) == ' ')) {
-        const char* j = i+1;
-        for (; *j; ++j) {
-          if (*j == ':')
-            break;
-        }
-
-        if (*j && (*(j+1) == 0 || *(j+1) == ' ')) {
-          if (i != text) {
-            // Here i is ':' and i-1 is a whitespace ' '
-            m_indicators->addTextIndicator(std::string(text, i-1).c_str());
-          }
-
-          auto part = theme->getPartById("icon_" + std::string(i+1, j));
-          if (part)
-            add(part.get(), true);
-
-          text = i = (*(j+1) == ' ' ? j+2: j+1);
-	  continue;
-        }
+    for (auto& token : tokenizeStatusBarText(text)) {
+      if (token.kind == StatusBarTextToken::Kind::Text) {
+        m_indicators->addTextIndicator(token.value.c_str());
       }
-      ++i;
+      else {
+        auto part = theme->getPartById("icon_" + token.value);
+        if (part)
+          add(part.get(), true);
+      }
     }
-
-    if (*text != 0)
-      m_indicators->addTextIndicator(text);
 
     return *this;
   }

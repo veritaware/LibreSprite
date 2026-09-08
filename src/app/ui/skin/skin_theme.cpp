@@ -29,6 +29,7 @@
 #include "app/ui/skin/skin_slider_property.h"
 #include "app/ui/skin/skin_style_property.h"
 #include "app/ui/skin/skin_theme.h"
+#include "app/ui/skin/skin_theme_fonts.h"
 
 #include <ranges>
 
@@ -380,8 +381,8 @@ namespace app::skin
     // (default) entry, then any remaining entries so loadFont() still has
     // fallbacks to try if the preferred file can't be loaded.
     void collectFontFamily(const tinyxml2::XMLElement* family,
-                            const std::string& skinId,
                             const std::string& lang,
+                            const std::function<std::optional<std::string>(const std::string&)>& resolveFontFile,
                             std::vector<std::pair<std::string, size_t>>& output) {
       struct Entry {
         std::string name;
@@ -426,7 +427,7 @@ namespace app::skin
       auto addEntry = [&](const Entry* entry) {
         if (!entry)
           return;
-        if (auto path = findSkinFontFile(skinId, entry->name))
+        if (auto path = resolveFontFile(entry->name))
           output.emplace_back(*path, entry->size);
       };
 
@@ -438,6 +439,31 @@ namespace app::skin
     }
 
   } // anonymous namespace
+
+  void parseFontFamiliesFromSkinXml(
+    const tinyxml2::XMLDocument& doc,
+    const std::string& lang,
+    const std::function<std::optional<std::string>(const std::string&)>& resolveFontFile,
+    std::vector<std::pair<std::string, size_t>>& mainFonts,
+    std::vector<std::pair<std::string, size_t>>& miniFonts)
+  {
+    const tinyxml2::XMLElement* fonts = tinyxml2::XMLHandle(const_cast<tinyxml2::XMLDocument*>(&doc))
+                                        .FirstChildElement("skin")
+                                        .FirstChildElement("fonts").ToElement();
+    if (!fonts)
+      return;
+
+    for (const auto* family = fonts->FirstChildElement("family"); family;
+         family = family->NextSiblingElement("family")) {
+      const char* id = family->Attribute("id");
+      if (!id)
+        continue;
+      if (std::strcmp(id, "main_font") == 0)
+        collectFontFamily(family, lang, resolveFontFile, mainFonts);
+      else if (std::strcmp(id, "mini_font") == 0)
+        collectFontFamily(family, lang, resolveFontFile, miniFonts);
+    }
+  }
 
   void SkinTheme::loadFontFamiliesFromSkinXml(const std::string& skinId,
                                                std::vector<std::pair<std::string, size_t>>& mainFonts,
@@ -454,23 +480,10 @@ namespace app::skin
       return;
     }
 
-    const tinyxml2::XMLElement* fonts = tinyxml2::XMLHandle(doc.get())
-                                        .FirstChildElement("skin")
-                                        .FirstChildElement("fonts").ToElement();
-    if (!fonts)
-      return;
-
-    const std::string lang = getLanguage();
-    for (const auto* family = fonts->FirstChildElement("family"); family;
-         family = family->NextSiblingElement("family")) {
-      const char* id = family->Attribute("id");
-      if (!id)
-        continue;
-      if (std::strcmp(id, "main_font") == 0)
-        collectFontFamily(family, skinId, lang, mainFonts);
-      else if (std::strcmp(id, "mini_font") == 0)
-        collectFontFamily(family, skinId, lang, miniFonts);
-    }
+    parseFontFamiliesFromSkinXml(
+      *doc, getLanguage(),
+      [&skinId](const std::string& name) { return findSkinFontFile(skinId, name); },
+      mainFonts, miniFonts);
   }
 
   void SkinTheme::loadXml(const std::string& skinId)
