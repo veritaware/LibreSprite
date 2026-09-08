@@ -8,6 +8,8 @@
 #include "config.h"
 #endif
 
+#include "app/commands/cmd_fill.h"
+
 #include "app/color.h"
 #include "app/color_utils.h"
 #include "app/commands/command.h"
@@ -34,10 +36,9 @@ using namespace doc;
 class FillWindow : public app::gen::Fill {
 };
 
-namespace {
-
 // Fills the pixels of the active layer/cel that fall inside the current
 // selection with the given color/opacity. Used by both Fill and Quick Fill.
+// Declared in cmd_fill.h.
 void fill_mask(Context* context, const app::Color& color, int opacity,
                const char* actionName)
 {
@@ -87,8 +88,6 @@ void fill_mask(Context* context, const app::Color& color, int opacity,
 
   update_screen_for_document(document);
 }
-
-} // anonymous namespace
 
 class FillCommand : public Command {
 public:
