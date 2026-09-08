@@ -1,5 +1,6 @@
 // LibreSprite Scripting Library
-// Copyright (c) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
+// Besprited   | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -53,7 +54,12 @@ namespace script {
       template <typename Func, unsigned int ...I>
       struct helper<Func, true, std::tuple<Args...>, I...> {
         static Value call(Func&& func, Value* args) {
-          return func(static_cast<Args>(args[I])...);
+          if constexpr (std::is_void<ReturnType>::value) {
+            func(static_cast<Args>(args[I])...);
+            return Value{};
+          } else {
+            return func(static_cast<Args>(args[I])...);
+          }
         }
       };
 
@@ -80,7 +86,12 @@ namespace script {
       template <typename Func, unsigned int ...I>
       struct helper<Func, true, std::tuple<Args...>, I...> {
         static Value call(Func&& func, Value* args) {
-          return func(static_cast<Args>(args[I])...);
+          if constexpr (std::is_void<ReturnType>::value) {
+            func(static_cast<Args>(args[I])...);
+            return Value{};
+          } else {
+            return func(static_cast<Args>(args[I])...);
+          }
         }
       };
 
@@ -122,7 +133,13 @@ namespace script {
 
     Function& operator = (const Function& other) = default;
 
-    template<typename NativeFunction>
+    // Excludes Function itself so this forwarding-reference constructor
+    // doesn't shadow the copy/move constructors above for non-const lvalue
+    // Functions (a plain `Function copy(f);` would otherwise bind here -
+    // exact match to Function& - instead of to the `const Function&` copy
+    // ctor, which needs an extra const-qualification and so ranks worse).
+    template<typename NativeFunction,
+             typename std::enable_if<!std::is_same<typename std::decay<NativeFunction>::type, Function>::value, int>::type = 0>
     Function(NativeFunction&& func) : argCount(function_traits<NativeFunction>::arity) {
       call = [func](Value& result, std::vector<Value>& arguments) {
         *getVarArgsPtr() = &arguments;
@@ -136,7 +153,14 @@ namespace script {
     }
 
     void operator () () {
-      for (int i = 0, max = std::min(defaults.size(), argCount); i < max; ++i) {
+      // `defaults` is indexed by parameter position (setDefault(0, 0, 0,
+      // 255) means "default r/g/b/a to those values"). Only fill in the
+      // trailing parameters the caller actually omitted - starting the
+      // loop at `arguments.size()` instead of 0 - so a partially-applied
+      // call (e.g. rgba(100) supplying only r) still gets the right
+      // per-parameter defaults for g, b and a instead of the whole
+      // defaults list being appended after whatever was already provided.
+      for (std::size_t i = arguments.size(), max = std::min(defaults.size(), argCount); i < max; ++i) {
         arguments.push_back(defaults[i]);
       }
       while (arguments.size() < argCount) {
