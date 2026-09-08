@@ -1,5 +1,6 @@
 // Aseprite    | Copyright (C) 2001-2016  David Capello
 // LibreSprite | Copyright (C)      2024  LibreSprite contributors
+// Besprited   | Copyright (C)      2026  Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -32,6 +33,15 @@ namespace app {
 
   int init_module_gui();
   void exit_module_gui();
+
+  // First-run UI-scale guess: picks a scale from the primary display's
+  // resolution, keeping the post-scale (logical) screen height usable for
+  // the editor (~400px is the practical minimum). `screenH` is the real
+  // desktop height when known; when it isn't (<= 0), `fallbackH` (the
+  // initial small window's height) is used instead. Thresholds are
+  // deliberately conservative since on Hi-DPI setups SDL may report either
+  // pixels or points depending on the platform.
+  int guessUiScale(int screenH, int fallbackH);
 
   void update_screen_for_document(const Document* document);
 

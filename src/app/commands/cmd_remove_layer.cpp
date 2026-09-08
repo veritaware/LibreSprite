@@ -9,6 +9,8 @@
 #include "config.h"
 #endif
 
+#include "app/commands/cmd_remove_layer.h"
+
 #include "app/app.h"
 #include "app/commands/command.h"
 #include "app/context_access.h"
@@ -23,6 +25,25 @@
 #include "ui/widget.h"
 
 namespace app {
+
+bool wouldRemoveAllLayers(int layersInRange, int totalLayers)
+{
+  return layersInRange == totalLayers;
+}
+
+bool wouldRemoveTheLastLayer(int totalLayers)
+{
+  return totalLayers == 1;
+}
+
+bool anyLayerHidden(const std::vector<bool>& layerVisibility)
+{
+  for (bool visible : layerVisibility) {
+    if (!visible)
+      return true;
+  }
+  return false;
+}
 
 class RemoveLayerCommand : public Command {
 public:
@@ -60,19 +81,16 @@ void RemoveLayerCommand::onExecute(Context* context)
     // TODO the range of selected layer should be in doc::Site.
     auto range = App::instance()->timeline()->range();
     if (range.enabled()) {
-      if (range.layers() == sprite->countLayers()) {
+      if (wouldRemoveAllLayers(range.layers(), sprite->countLayers())) {
         ui::Alert::show("Error<<You cannot delete all layers.||&OK");
         return;
       }
 
-      bool anyHidden = false;
+      std::vector<bool> visibility;
       for (LayerIndex layer = range.layerEnd(); layer >= range.layerBegin(); --layer) {
-        if (!sprite->indexToLayer(layer)->isVisible()) {
-          anyHidden = true;
-          break;
-        }
+        visibility.push_back(sprite->indexToLayer(layer)->isVisible());
       }
-      if (anyHidden &&
+      if (anyLayerHidden(visibility) &&
           ui::Alert::show("Warning"
                            "<<One or more of the selected layers are hidden."
                            "<<Do you really want to delete them?"
@@ -87,7 +105,7 @@ void RemoveLayerCommand::onExecute(Context* context)
       transaction.commit();
     }
     else {
-      if (sprite->countLayers() == 1) {
+      if (wouldRemoveTheLastLayer(sprite->countLayers())) {
         ui::Alert::show("Error<<You cannot delete the last layer.||&OK");
         return;
       }

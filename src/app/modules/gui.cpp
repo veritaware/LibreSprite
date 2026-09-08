@@ -156,6 +156,13 @@ static bool create_main_display(bool gpuAccel,
   return (main_display != nullptr);
 }
 
+int guessUiScale(int screenH, int fallbackH)
+{
+  if (screenH <= 0)
+    screenH = fallbackH;
+  return MID(1, 1 + (screenH >= 720) + (screenH >= 1200) + (screenH >= 1800), 4);
+}
+
 // Initializes GUI.
 int init_module_gui()
 {
@@ -196,18 +203,10 @@ int init_module_gui()
 	  #ifdef EMSCRIPTEN
 	  uiScale = 2;
 	  #else
-	  // Guess a sensible UI scale on the first run from the primary
-	  // display's resolution, keeping the post-scale (logical) screen
-	  // height usable for the editor (~400px is the practical minimum).
 	  // The initial window is only a small fallback size, so prefer the
 	  // real desktop height and only fall back to the window height when
-	  // it's unavailable. Note: on Hi-DPI setups SDL may report either
-	  // pixels or points depending on the platform, so the thresholds are
-	  // deliberately conservative.
-	  int screenH = she::instance()->desktopSize().h;
-	  if (screenH <= 0)
-	      screenH = ui::display_h();
-	  uiScale = MID(1, 1 + (screenH >= 720) + (screenH >= 1200) + (screenH >= 1800), 4);
+	  // it's unavailable.
+	  uiScale = guessUiScale(she::instance()->desktopSize().h, ui::display_h());
 	  #endif
           Preferences::instance().experimental.uiScale(uiScale);
       }
