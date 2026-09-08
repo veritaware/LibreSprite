@@ -11,9 +11,27 @@
 #include "app/crash/write_document.h"
 #include "app/document.h"
 #include "base/fs.h"
+#include "base/path.h"
 #include "doc/doc.h"
 
 using namespace app;
+
+namespace {
+
+// crash::write_document() populates the directory with several files
+// (cel-*, celdata-*, doc-*, img-*, lay-*, pal-*, spr-*) - base::remove_directory()
+// only removes an empty directory, so a fixture dir left over from a
+// previous write needs its contents cleared out first.
+void removeDirRecursive(const std::string& dir)
+{
+  if (!base::is_directory(dir))
+    return;
+  for (const auto& entry : base::list_files(dir))
+    base::delete_file(base::join_path(dir, entry));
+  base::remove_directory(dir);
+}
+
+} // namespace
 
 TEST(ReadDocumentInfo, NonSquareCanvasWidthAndHeightAreNotSwapped)
 {
@@ -29,8 +47,7 @@ TEST(ReadDocumentInfo, NonSquareCanvasWidthAndHeightAreNotSwapped)
   doc->setFilename("read_document_info_test.ase");
 
   const std::string dir = "read_document_info_test_dir";
-  if (base::is_directory(dir))
-    base::remove_directory(dir);
+  removeDirRecursive(dir);
   base::make_all_directories(dir);
 
   crash::write_document(dir, static_cast<app::Document*>(doc));
@@ -42,6 +59,7 @@ TEST(ReadDocumentInfo, NonSquareCanvasWidthAndHeightAreNotSwapped)
 
   doc->close();
   delete doc;
+  removeDirRecursive(dir);
 }
 
 TEST(ReadDocumentInfo, SquareCanvasStillRoundTripsCorrectly)
@@ -56,8 +74,7 @@ TEST(ReadDocumentInfo, SquareCanvasStillRoundTripsCorrectly)
   doc->setFilename("read_document_info_square_test.ase");
 
   const std::string dir = "read_document_info_square_test_dir";
-  if (base::is_directory(dir))
-    base::remove_directory(dir);
+  removeDirRecursive(dir);
   base::make_all_directories(dir);
 
   crash::write_document(dir, static_cast<app::Document*>(doc));
@@ -69,15 +86,17 @@ TEST(ReadDocumentInfo, SquareCanvasStillRoundTripsCorrectly)
 
   doc->close();
   delete doc;
+  removeDirRecursive(dir);
 }
 
 TEST(ReadDocumentInfo, ReturnsFalseForADirectoryWithNoBackup)
 {
   const std::string dir = "read_document_info_empty_test_dir";
-  if (base::is_directory(dir))
-    base::remove_directory(dir);
+  removeDirRecursive(dir);
   base::make_all_directories(dir);
 
   crash::DocumentInfo info;
   EXPECT_FALSE(crash::read_document_info(dir, info));
+
+  removeDirRecursive(dir);
 }

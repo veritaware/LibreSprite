@@ -144,12 +144,17 @@ void Widget::initTheme()
   onInitTheme(ev);
 }
 
+void Widget::onEvalError(const std::string& message) const
+{
+  ui::Alert::show("Error evaluating expression  <<%s||&OK", message.c_str());
+}
+
 int Widget::textInt() const
 {
   auto val = evalmath::eval(m_text);
   if(!val)
   {
-    ui::Alert::show("Error evaluating expression  <<%s||&OK", val.error().c_str());
+    onEvalError(val.error());
     return 1;
   }
 
@@ -161,7 +166,7 @@ double Widget::textDouble() const
   auto val = evalmath::eval(m_text);
   if(!val)
   {
-    ui::Alert::show("Error evaluating expression  <<%s||&OK", val.error().c_str());
+    onEvalError(val.error());
     return 1.0;
   }
   return std::round(val.value() * 1000.0) / 1000.0;
