@@ -1,5 +1,6 @@
 // Aseprite UI Library
 // Copyright (C) 2001-2013, 2015  David Capello
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -7,9 +8,12 @@
 #pragma once
 
 #include "base/signal.h"
+#include "gfx/rect.h"
 #include "ui/register_message.h"
 #include "ui/separator.h"
 #include "ui/widget.h"
+
+#include <memory>
 
 namespace ui {
 
@@ -29,10 +33,22 @@ namespace ui {
       return m_menuitem;
     }
 
+    // True when this menu's items don't fit in the available height
+    // and must be scrolled vertically.
+    bool isScrollable() const { return m_scrollable; }
+    bool canScrollUp() const { return m_scrollable && m_scrollTopIndex > 0; }
+    bool canScrollDown() const { return m_scrollable && m_hasMoreBelow; }
+
+    // Bounds (in screen coordinates) of the scroll indicators, empty
+    // when scrolling in that direction isn't possible/needed.
+    const gfx::Rect& scrollUpBounds() const { return m_scrollUpBounds; }
+    const gfx::Rect& scrollDownBounds() const { return m_scrollDownBounds; }
+
   protected:
     virtual void onPaint(PaintEvent& ev) override;
     virtual void onResize(ResizeEvent& ev) override;
     virtual void onSizeHint(SizeHintEvent& ev) override;
+    virtual bool onProcessMessage(Message* msg) override;
 
   private:
     void setOwnerMenuItem(MenuItem* ownerMenuItem) {
@@ -45,7 +61,26 @@ namespace ui {
     void highlightItem(MenuItem* menuitem, bool click, bool open_submenu, bool select_first_child);
     void unhighlightItem();
 
+    void layoutItems();
+    void scrollBy(int itemDelta);
+    void ensureVisible(Widget* item);
+    void startAutoScroll(int direction);
+    void stopAutoScroll();
+
     MenuItem* m_menuitem;         // From where the menu was open
+
+    // Vertical scrolling state (only used for popup/submenu menus,
+    // never for the top-level menu-bar).
+    bool m_scrollable;
+    bool m_hasMoreBelow;
+    int m_scrollTopIndex;
+    gfx::Rect m_scrollUpBounds;
+    gfx::Rect m_scrollDownBounds;
+
+    // While the mouse hovers over one of the scroll arrows, this timer
+    // repeatedly scrolls the menu (-1 = up, 0 = not auto-scrolling, 1 = down).
+    std::unique_ptr<Timer> m_scrollTimer;
+    int m_autoScrollDirection;
 
     friend class MenuBox;
     friend class MenuItem;

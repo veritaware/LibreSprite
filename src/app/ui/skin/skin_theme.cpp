@@ -1593,10 +1593,27 @@ namespace app::skin
 
   void SkinTheme::paintMenu(PaintEvent& ev)
   {
-    const Widget* widget = ev.getSource();
+    const auto widget = static_cast<const ui::Menu*>(ev.getSource());
     Graphics* g = ev.graphics();
 
     g->fillRect(BGCOLOR, g->getClipBounds());
+
+    // When the menu doesn't fit in the display, draw scroll
+    // indicators over the reserved strips at the top/bottom.
+    if (widget->canScrollUp()) {
+      const gfx::Rect rc = widget->scrollUpBounds();
+      she::Surface* icon = parts.comboboxArrowUpSelected()->bitmap(0);
+      g->drawRgbaSurface(icon,
+                          rc.x + rc.w/2 - icon->width()/2,
+                          rc.y + rc.h/2 - icon->height()/2);
+    }
+    if (widget->canScrollDown()) {
+      const gfx::Rect rc = widget->scrollDownBounds();
+      she::Surface* icon = parts.comboboxArrowDownSelected()->bitmap(0);
+      g->drawRgbaSurface(icon,
+                          rc.x + rc.w/2 - icon->width()/2,
+                          rc.y + rc.h/2 - icon->height()/2);
+    }
   }
 
   void SkinTheme::paintMenuItem(PaintEvent& ev)
@@ -1661,29 +1678,20 @@ namespace app::skin
 
     // For menu-box
     if (!bar) {
-      // Draw the arrown (to indicate which this menu has a sub-menu)
+      // Draw the arrow (to indicate that this menu has a sub-menu)
       if (widget->getSubmenu())
       {
-        int c;
-        // Enabled
-        if (widget->isEnabled()) {
-          for (c = 0; c < 3 * scale; c++)
-            g->drawVLine(fg,
-                         bounds.x2() - 3 * scale - c,
-                         bounds.y + bounds.h / 2 - c, 2 * c + 1);
-        }
-        // Disabled
-        else {
-          for (c = 0; c < 3 * scale; c++)
-            g->drawVLine(colors.background(),
-                         bounds.x2() - 3 * scale - c + 1,
-                         bounds.y + bounds.h / 2 - c + 1, 2 * c + 1);
+        she::Surface* icon;
+        if (!widget->isEnabled())
+          icon = parts.comboboxArrowRightDisabled()->bitmap(0);
+        else if (widget->isHighlighted())
+          icon = parts.comboboxArrowRightSelected()->bitmap(0);
+        else
+          icon = parts.comboboxArrowRight()->bitmap(0);
 
-          for (c = 0; c < 3 * scale; c++)
-            g->drawVLine(colors.disabled(),
-                         bounds.x2() - 3 * scale - c,
-                         bounds.y + bounds.h / 2 - c, 2 * c + 1);
-        }
+        const int x = bounds.x2() - 3 * scale - icon->width();
+        const int y = bounds.y + bounds.h / 2 - icon->height() / 2;
+        g->drawRgbaSurface(icon, x, y);
       }
       // Draw the keyboard shortcut
       else if (const auto appMenuItem = dynamic_cast<AppMenuItem*>(widget)) {

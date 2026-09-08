@@ -1,5 +1,6 @@
 // Aseprite UI Library
 // Copyright (C) 2001-2016  David Capello
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -19,6 +20,7 @@
 #include <cctype>
 
 static const int kTimeoutToOpenSubmenu = 250;
+static const int kMenuAutoScrollInterval = 90;
 
 namespace ui {
 
@@ -130,6 +132,10 @@ static MenuItem* find_previtem(Menu* menu, MenuItem* menuitem);
 Menu::Menu()
   : Widget(kMenuWidget)
   , m_menuitem(NULL)
+  , m_scrollable(false)
+  , m_hasMoreBelow(false)
+  , m_scrollTopIndex(0)
+  , m_autoScrollDirection(0)
 {
   initTheme();
 }
@@ -286,6 +292,13 @@ void Menu::showPopup(const gfx::Point& pos)
 
   window->remapWindow();
 
+  // Don't let the popup window be taller than the display, so long
+  // menus become scrollable instead of overflowing the screen.
+  if (window->bounds().h > ui::display_h()) {
+    window->setBounds(Rect(window->bounds().x, window->bounds().y,
+                            window->bounds().w, ui::display_h()));
+  }
+
   // Menubox position
   window->positionWindow(
     MID(0, pos.x, ui::display_w() - window->bounds().w),
@@ -316,25 +329,197 @@ void Menu::onPaint(PaintEvent& ev)
 void Menu::onResize(ResizeEvent& ev)
 {
   setBoundsQuietly(ev.bounds());
+  layoutItems();
+}
 
+// Positions the menu's children, hiding whichever items don't fit in
+// the available height and reserving room for scroll indicators when
+// that happens. Menu-bars are never scrollable, they lay out
+// horizontally and always show every item.
+void Menu::layoutItems()
+{
   Rect cpos = childrenBounds();
-  bool isBar = (parent()->type() == kMenuBarWidget);
+  bool isBar = (parent() && parent()->type() == kMenuBarWidget);
 
-  for (auto child : children()) {
-    Size reqSize = child->sizeHint();
+  if (isBar) {
+    m_scrollable = false;
+    m_hasMoreBelow = false;
+    m_scrollTopIndex = 0;
+    m_scrollUpBounds = m_scrollDownBounds = Rect();
 
-    if (isBar)
+    for (auto child : children()) {
+      Size reqSize = child->sizeHint();
       cpos.w = reqSize.w;
-    else
-      cpos.h = reqSize.h;
-
-    child->setBounds(cpos);
-
-    if (isBar)
+      child->setVisible(true);
+      child->setBounds(cpos);
       cpos.x += cpos.w;
-    else
-      cpos.y += cpos.h;
+    }
+    return;
   }
+
+  const WidgetsList& items = children();
+  const int n = (int)items.size();
+
+  int totalHeight = 0;
+  int rowHeight = 0;
+  for (auto child : items) {
+    int h = child->sizeHint().h;
+    totalHeight += h;
+    rowHeight = MAX(rowHeight, h);
+  }
+
+  m_scrollable = (n > 0 && rowHeight > 0 && totalHeight > cpos.h);
+
+  if (!m_scrollable) {
+    m_scrollTopIndex = 0;
+    m_hasMoreBelow = false;
+    m_scrollUpBounds = m_scrollDownBounds = Rect();
+
+    for (auto child : items) {
+      Size reqSize = child->sizeHint();
+      cpos.h = reqSize.h;
+      child->setVisible(true);
+      child->setBounds(cpos);
+      cpos.y += cpos.h;
+    }
+    return;
+  }
+
+  m_scrollTopIndex = MID(0, m_scrollTopIndex, n-1);
+
+  // How many items (starting from m_scrollTopIndex) fit in the given
+  // available height. Always fits at least one item.
+  auto fitCount = [&items, this](int avail) {
+    int used = 0, count = 0;
+    for (int i = m_scrollTopIndex; i < (int)items.size(); ++i) {
+      int h = items[i]->sizeHint().h;
+      if (count > 0 && used + h > avail)
+        break;
+      used += h;
+      ++count;
+    }
+    return count;
+  };
+
+  bool showTopArrow = (m_scrollTopIndex > 0);
+  int available = cpos.h - (showTopArrow ? rowHeight : 0);
+  int count = fitCount(available);
+  bool showBottomArrow = (m_scrollTopIndex + count < n);
+  if (showBottomArrow) {
+    available -= rowHeight;
+    count = fitCount(available);
+    showBottomArrow = (m_scrollTopIndex + count < n);
+  }
+  m_hasMoreBelow = showBottomArrow;
+
+  int y = cpos.y + (showTopArrow ? rowHeight : 0);
+  for (int i = 0; i < n; ++i) {
+    Widget* child = items[i];
+    if (i >= m_scrollTopIndex && i < m_scrollTopIndex + count) {
+      Size reqSize = child->sizeHint();
+      child->setVisible(true);
+      child->setBounds(Rect(cpos.x, y, cpos.w, reqSize.h));
+      y += reqSize.h;
+    }
+    else {
+      child->setVisible(false);
+    }
+  }
+
+  m_scrollUpBounds = showTopArrow ?
+    Rect(cpos.x, cpos.y, cpos.w, rowHeight) : Rect();
+  m_scrollDownBounds = showBottomArrow ?
+    Rect(cpos.x, cpos.y + cpos.h - rowHeight, cpos.w, rowHeight) : Rect();
+}
+
+// Scrolls the menu by the given number of items (negative scrolls up).
+// Refuses to scroll past either end: up is bounded by m_scrollTopIndex
+// reaching 0, down is bounded by m_hasMoreBelow (computed by the last
+// layoutItems() call) so the last item can't be scrolled past into
+// trailing blank space.
+void Menu::scrollBy(int itemDelta)
+{
+  if (!m_scrollable)
+    return;
+  if (itemDelta > 0 && !m_hasMoreBelow)
+    return;
+  if (itemDelta < 0 && m_scrollTopIndex <= 0)
+    return;
+
+  int n = (int)children().size();
+  int newTop = MID(0, m_scrollTopIndex + itemDelta, n-1);
+  if (newTop == m_scrollTopIndex)
+    return;
+
+  m_scrollTopIndex = newTop;
+  layoutItems();
+  invalidate();
+}
+
+// Starts (or redirects) continuous scrolling while the mouse hovers
+// over a scroll arrow. direction is -1 (up) or 1 (down). Does nothing
+// (and stops any current auto-scroll) if that direction is already at
+// its bound.
+void Menu::startAutoScroll(int direction)
+{
+  if ((direction > 0 && !m_hasMoreBelow) ||
+      (direction < 0 && m_scrollTopIndex <= 0)) {
+    stopAutoScroll();
+    return;
+  }
+
+  if (m_autoScrollDirection == direction)
+    return;
+
+  m_autoScrollDirection = direction;
+
+  if (!m_scrollTimer)
+    m_scrollTimer.reset(new Timer(kMenuAutoScrollInterval, this));
+
+  scrollBy(direction);
+  m_scrollTimer->start();
+}
+
+void Menu::stopAutoScroll()
+{
+  m_autoScrollDirection = 0;
+  if (m_scrollTimer)
+    m_scrollTimer->stop();
+}
+
+// Scrolls, if needed, so that the given item (usually the newly
+// highlighted one) is visible.
+void Menu::ensureVisible(Widget* item)
+{
+  if (!item || !m_scrollable)
+    return;
+
+  const WidgetsList& items = children();
+  int index = -1;
+  for (int i = 0; i < (int)items.size(); ++i) {
+    if (items[i] == item) {
+      index = i;
+      break;
+    }
+  }
+  if (index < 0)
+    return;
+
+  int oldTop = m_scrollTopIndex;
+
+  if (index < m_scrollTopIndex) {
+    m_scrollTopIndex = index;
+    layoutItems();
+  }
+  else {
+    while (!items[index]->isVisible() && m_scrollTopIndex < index) {
+      ++m_scrollTopIndex;
+      layoutItems();
+    }
+  }
+
+  if (m_scrollTopIndex != oldTop)
+    invalidate();
 }
 
 void Menu::onSizeHint(SizeHintEvent& ev)
@@ -360,6 +545,62 @@ void Menu::onSizeHint(SizeHintEvent& ev)
   size.h += border().height();
 
   ev.setSizeHint(size);
+}
+
+bool Menu::onProcessMessage(Message* msg)
+{
+  switch (msg->type()) {
+
+    case kMouseDownMessage:
+    case kMouseMoveMessage:
+      if (m_scrollable) {
+        MenuBaseData* base = get_base(this);
+        if (base && base->is_processing)
+          break;
+
+        gfx::Point mousePos = static_cast<MouseMessage*>(msg)->position();
+
+        if (!m_scrollUpBounds.isEmpty() && m_scrollUpBounds.contains(mousePos)) {
+          startAutoScroll(-1);
+          return true;
+        }
+        if (!m_scrollDownBounds.isEmpty() && m_scrollDownBounds.contains(mousePos)) {
+          startAutoScroll(1);
+          return true;
+        }
+        stopAutoScroll();
+      }
+      break;
+
+    case kMouseLeaveMessage:
+      stopAutoScroll();
+      break;
+
+    case kMouseWheelMessage:
+      if (m_scrollable) {
+        gfx::Point wheelDelta = static_cast<MouseMessage*>(msg)->wheelDelta();
+        if (wheelDelta.y != 0) {
+          scrollBy(wheelDelta.y > 0 ? 1 : -1);
+          return true;
+        }
+      }
+      break;
+
+    case kTimerMessage:
+      if (m_scrollTimer &&
+          static_cast<TimerMessage*>(msg)->timer() == m_scrollTimer.get()) {
+        if ((m_autoScrollDirection > 0 && !m_hasMoreBelow) ||
+            (m_autoScrollDirection < 0 && m_scrollTopIndex <= 0))
+          stopAutoScroll();
+        else
+          scrollBy(m_autoScrollDirection);
+        return true;
+      }
+      break;
+
+  }
+
+  return Widget::onProcessMessage(msg);
 }
 
 bool MenuBox::onProcessMessage(Message* msg)
@@ -733,6 +974,13 @@ bool MenuItem::onProcessMessage(Message* msg)
         // New window and new menu-box
         Window* window = new CustomizedWindowForMenuBox(menubox);
 
+        // Don't let the submenu window be taller than the display, so
+        // long menus become scrollable instead of overflowing the screen.
+        if (window->bounds().h > ui::display_h()) {
+          window->setBounds(Rect(window->bounds().x, window->bounds().y,
+                                  window->bounds().w, ui::display_h()));
+        }
+
         // Menubox position
         Rect pos = window->bounds();
 
@@ -962,6 +1210,8 @@ void Menu::highlightItem(MenuItem* menuitem, bool click, bool open_submenu, bool
   }
 
   if (menuitem) {
+    ensureVisible(menuitem);
+
     if (!menuitem->isHighlighted()) {
       menuitem->setHighlighted(true);
       menuitem->invalidate();
