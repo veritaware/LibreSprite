@@ -12,10 +12,14 @@
 #include "app/document.h"
 #include "app/file/file.h"
 #include "app/file/file_formats_manager.h"
+#include "base/fs.h"
 #include "doc/doc.h"
+#include "she/system.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <vector>
 
 using namespace app;
@@ -78,4 +82,102 @@ TEST(File, SeveralSizes)
       }
     }
   }
+}
+
+TEST(FileFormatsManager, SupportListsAseThenPngFirst)
+{
+  auto formats = FileFormatsManager::instance()->support(FILE_SUPPORT_LOAD);
+  ASSERT_GE(formats.size(), 2u);
+
+  // AseFormat overrides listPriority() to -100 and PngFormat to 0; every
+  // other registered format is left at the default of 1, so these two must
+  // sort to the front regardless of how many other formats are registered.
+  EXPECT_STREQ("ase", formats[0]->name());
+  EXPECT_STREQ("png", formats[1]->name());
+
+  for (std::size_t i = 2; i < formats.size(); ++i) {
+    EXPECT_STRNE("ase", formats[i]->name());
+    EXPECT_STRNE("png", formats[i]->name());
+  }
+}
+
+TEST(FileFormatsManager, GetFileFormatByExtensionIsCaseInsensitive)
+{
+  auto* manager = FileFormatsManager::instance();
+
+  EXPECT_STREQ("ase", manager->getFileFormatByExtension("ase")->name());
+  EXPECT_STREQ("ase", manager->getFileFormatByExtension("ASE")->name());
+  EXPECT_STREQ("ase", manager->getFileFormatByExtension("AsE")->name());
+  EXPECT_STREQ("png", manager->getFileFormatByExtension("PNG")->name());
+}
+
+TEST(FileFormatsManager, GetFileFormatByExtensionMatchesAnyTokenInAMultiExtensionList)
+{
+  auto* manager = FileFormatsManager::instance();
+
+  // AseFormat: onGetExtensions() == "ase,aseprite"
+  EXPECT_STREQ("ase", manager->getFileFormatByExtension("aseprite")->name());
+  EXPECT_STREQ("ase", manager->getFileFormatByExtension("ASEPRITE")->name());
+
+  // JpegFormat: onGetExtensions() == "jpeg,jpg"
+  EXPECT_STREQ("jpeg", manager->getFileFormatByExtension("jpeg")->name());
+  EXPECT_STREQ("jpeg", manager->getFileFormatByExtension("jpg")->name());
+  EXPECT_STREQ("jpeg", manager->getFileFormatByExtension("JPG")->name());
+}
+
+TEST(FileFormatsManager, GetFileFormatByExtensionReturnsNullForAnUnknownExtension)
+{
+  EXPECT_EQ(nullptr, FileFormatsManager::instance()->getFileFormatByExtension("not-a-real-format"));
+}
+
+TEST(File, LoadFallsBackToSheFormatWhenTheExtensionMatchesNothing)
+{
+  // she::instance() must be live for SheFormat::onLoad() (it calls
+  // she::instance()->loadRgbaSurface()) - none of the other tests in this
+  // file need it, so it's not constructed by default.
+  std::unique_ptr<she::System> sys(she::create_system());
+
+  app::Context ctx;
+  const int w = 5, h = 4;
+
+  doc::Document* doc = ctx.documents().add(w, h, doc::ColorMode::RGB);
+  doc->setFilename("she_fallback_test.png");
+
+  Layer* layer = doc->sprite()->folder()->getFirstLayer();
+  ASSERT_TRUE(layer != NULL);
+  Image* image = layer->cel(frame_t(0))->image();
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x)
+      put_pixel(image, x, y, doc::rgba(x * 10, y * 20, 128, 255));
+
+  ASSERT_EQ(0, save_document(&ctx, doc));
+  doc->close();
+  delete doc;
+
+  // A real PNG file, but under an extension no registered FileFormat
+  // claims - getFileFormatByExtension() would return null for it, so
+  // loading must fall through to SheFormat's loadPriority()-based fallback
+  // (she_fallback_test.png -> she_fallback_test.notaformat).
+  ASSERT_TRUE(base::is_file("she_fallback_test.png"));
+  if (base::is_file("she_fallback_test.notaformat"))
+    base::delete_file("she_fallback_test.notaformat");
+  std::rename("she_fallback_test.png", "she_fallback_test.notaformat");
+
+  ASSERT_EQ(nullptr, FileFormatsManager::instance()->getFileFormatByExtension("notaformat"));
+
+  app::Document* loaded = load_document(&ctx, "she_fallback_test.notaformat");
+  ASSERT_NE(nullptr, loaded);
+  ASSERT_EQ(w, loaded->sprite()->width());
+  ASSERT_EQ(h, loaded->sprite()->height());
+
+  Layer* loadedLayer = loaded->sprite()->folder()->getFirstLayer();
+  ASSERT_TRUE(loadedLayer != NULL);
+  Image* loadedImage = loadedLayer->cel(frame_t(0))->image();
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x)
+      EXPECT_EQ(doc::rgba(x * 10, y * 20, 128, 255), loadedImage->getPixel(x, y))
+        << "at (" << x << "," << y << ")";
+
+  loaded->close();
+  delete loaded;
 }
