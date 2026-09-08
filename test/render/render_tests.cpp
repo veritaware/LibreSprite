@@ -187,6 +187,105 @@ TEST(Render, CheckedBackground)
     1, 1, 2, 2,
     2, 2, 1, 1,
     2, 2, 1, 1);
+
+  // With bgZoom on, a checker tile scales together with the zoom factor:
+  // size(1,1) at 3x zoom covers the same ground as size(3,3) at 1x zoom.
+  render.setBgCheckedSize(gfx::Size(1, 1));
+  render.renderSprite(dst.get(),
+    doc->sprite(), frame_t(0),
+    gfx::Clip(dst->bounds()),
+    Zoom(3, 1));
+  EXPECT_4X4_PIXELS(dst.get(),
+    1, 1, 1, 2,
+    1, 1, 1, 2,
+    1, 1, 1, 2,
+    2, 2, 2, 1);
+
+  // With bgZoom off, the tile size is left alone regardless of zoom (as
+  // long as it isn't smaller than one zoomed pixel, which would otherwise
+  // clamp it back up) - so this is the same span-3-columns pattern as
+  // size(3,3) at 1x zoom above, not the fully-covered single tile you'd
+  // get if the size were scaled by 2x too.
+  render.setBgZoom(false);
+  render.setBgCheckedSize(gfx::Size(3, 3));
+  render.renderSprite(dst.get(),
+    doc->sprite(), frame_t(0),
+    gfx::Clip(dst->bounds()),
+    Zoom(2, 1));
+  EXPECT_4X4_PIXELS(dst.get(),
+    1, 1, 1, 2,
+    1, 1, 1, 2,
+    1, 1, 1, 2,
+    2, 2, 2, 1);
+
+  // ... while with bgZoom back on, that same size(3,3) tile at 2x zoom
+  // becomes a single 6x6 tile - larger than the whole 4x4 canvas, so it's
+  // one solid color.
+  render.setBgZoom(true);
+  render.renderSprite(dst.get(),
+    doc->sprite(), frame_t(0),
+    gfx::Clip(dst->bounds()),
+    Zoom(2, 1));
+  EXPECT_4X4_PIXELS(dst.get(),
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1,
+    1, 1, 1, 1);
+}
+
+TEST(Render, CheckedBackgroundWithAnOddViewportOffset)
+{
+  Context ctx;
+  Document* doc = ctx.documents().add(4, 4, ColorMode::RGB);
+
+  std::unique_ptr<Image> dst(Image::create(IMAGE_RGB, 4, 4));
+
+  Render render;
+  render.setBgType(BgType::CHECKED);
+  render.setBgZoom(true);
+  render.setBgColor1(1);
+  render.setBgColor2(2);
+
+  // A source-space offset of one tile shifts the checker phase by one
+  // step, inverting the pattern relative to an unscrolled view - whether
+  // the offset is horizontal or vertical.
+  render.setBgCheckedSize(gfx::Size(1, 1));
+  clear_image(dst.get(), 0);
+  render.renderSprite(dst.get(), doc->sprite(), frame_t(0), gfx::Clip(0, 0, 1, 0, 4, 4));
+  EXPECT_4X4_PIXELS(dst.get(),
+    2, 1, 2, 1,
+    1, 2, 1, 2,
+    2, 1, 2, 1,
+    1, 2, 1, 2);
+
+  clear_image(dst.get(), 0);
+  render.renderSprite(dst.get(), doc->sprite(), frame_t(0), gfx::Clip(0, 0, 0, 1, 4, 4));
+  EXPECT_4X4_PIXELS(dst.get(),
+    2, 1, 2, 1,
+    1, 2, 1, 2,
+    2, 1, 2, 1,
+    1, 2, 1, 2);
+
+  // Offsetting by one tile in *both* directions flips the parity twice,
+  // landing back on the unscrolled pattern.
+  clear_image(dst.get(), 0);
+  render.renderSprite(dst.get(), doc->sprite(), frame_t(0), gfx::Clip(0, 0, 1, 1, 4, 4));
+  EXPECT_4X4_PIXELS(dst.get(),
+    1, 2, 1, 2,
+    2, 1, 2, 1,
+    1, 2, 1, 2,
+    2, 1, 2, 1);
+
+  // An offset that isn't a multiple of a (now 2px-wide) tile shifts each
+  // tile's visible split point rather than just flipping the parity.
+  render.setBgCheckedSize(gfx::Size(2, 2));
+  clear_image(dst.get(), 0);
+  render.renderSprite(dst.get(), doc->sprite(), frame_t(0), gfx::Clip(0, 0, 1, 0, 4, 4));
+  EXPECT_4X4_PIXELS(dst.get(),
+    1, 2, 2, 1,
+    1, 2, 2, 1,
+    2, 1, 1, 2,
+    2, 1, 1, 2);
 }
 
 TEST(Render, ZoomAndDstBounds)

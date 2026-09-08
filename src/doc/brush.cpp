@@ -1,5 +1,6 @@
 // Aseprite Document Library
-// Copyright (c) 2001-2016 David Capello
+// Aseprite  | Copyright (C) 2001-2016 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -304,8 +305,14 @@ void Brush::regenerate()
         else {
           int c = size/2;
           int r = m_size/2;
-	  int sa = r * sin(m_angle * (PI / 180.0f)) + 0.5;
-	  int ca = r * cos(m_angle * (PI / 180.0f)) + 0.5;
+          // Round to nearest, not truncate: adding 0.5 before an (int) cast
+          // only rounds correctly for non-negative values, since the cast
+          // truncates toward zero. sin()/cos() are negative for half of all
+          // angles, so the old `+ 0.5` idiom under-rounded those (e.g.
+          // sin(180°)=-1 gave -4 instead of -5 for r=5), making the brush
+          // asymmetric between mirror angles like 90°/180°/270°.
+	  int sa = std::lround(r * sin(m_angle * (PI / 180.0f)));
+	  int ca = std::lround(r * cos(m_angle * (PI / 180.0f)));
           int x1 = -ca - -sa;
           int y1 = -sa + -ca;
           int x2 =  ca - -sa;
@@ -329,8 +336,10 @@ void Brush::regenerate()
 
       case kLineBrushType: {
 	int r = m_size/2;
-	int sa = r * sin(m_angle * (PI / 180.0)) + 0.5;
-	int ca = r * cos(m_angle * (PI / 180.0)) + 0.5;
+        // See the note above kSquareBrushType: round to nearest (not
+        // truncate) so the line is symmetric across mirror angles.
+	int sa = std::lround(r * sin(m_angle * (PI / 180.0)));
+	int ca = std::lround(r * cos(m_angle * (PI / 180.0)));
 	int x1 = -ca + r;
 	int y1 = -sa + r;
 	int x2 =  ca + r;
