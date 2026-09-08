@@ -1,5 +1,6 @@
 // Aseprite    | Copyright (C) 2001-2016  David Capello
 // LibreSprite | Copyright (C) 2021       LibreSprite contributors
+// Besprited   | Copyright (C) 2026       Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -107,8 +108,18 @@ int save_document(Context* context, doc::Document* document)
   if (!fop)
     return -1;
 
-  // Operate in this same thread
-  fop->operate();
+  // createSaveDocumentOperation() can return a non-null FileOp that already
+  // has an error set - e.g. the target format doesn't support the
+  // sprite's color mode, reported this way (instead of returning null)
+  // specifically so a non-interactive caller can still surface the error
+  // below. operate() must not run in that case: FileFormat::onSave()
+  // implementations assume they're only ever invoked for pixel data in a
+  // format they declared support for, and crash otherwise (e.g. QoiFormat
+  // saving an indexed sprite).
+  if (!fop->hasError()) {
+    // Operate in this same thread
+    fop->operate();
+  }
   fop->done();
 
   if (fop->hasError()) {
