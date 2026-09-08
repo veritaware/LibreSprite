@@ -1,5 +1,5 @@
-// LibreSprite
-// Copyright (C) 2021 LibreSprite contributors
+// LibreSprite | Copyright (C) 2021 LibreSprite contributors
+// Besprited   | Copyright (C) 2026 Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -274,6 +274,12 @@ namespace app {
         });
       return pending.back();
     }
+
+    // Delivers whatever's currently ready right now, synchronously, on the
+    // calling thread. Exposed so tests can drive delayed()/addTask()
+    // callbacks deterministically without waiting on the real ui::Timer
+    // tick, which needs a running UI message loop.
+    void pump() { onTick(); }
 
     static TaskManager& instance() {
       if (!manager)

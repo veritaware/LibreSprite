@@ -35,6 +35,40 @@ TEST(IniFile, Basic)
   EXPECT_EQ(3, get_config_int("B", "b", 1));
 }
 
+TEST(IniFile, HasConfigValue)
+{
+  // Regression test: has_config_value() used to return true for an *absent*
+  // key (its body checked `== nullptr` instead of `!= nullptr`), silently
+  // inverting the meaning its own name promises and the meaning every call
+  // site (main_window.cpp's DPI-default guards) already assumed.
+  if (base::is_file("_has_config_value.ini"))
+    base::delete_file("_has_config_value.ini");
+
+  // set_config_file() re-loads into whatever CfgFile is already on top of
+  // the stack without clearing it first (real callers, e.g.
+  // Preferences::serializeDocPref(), always pair it with a preceding
+  // push_config_state() for exactly this reason - it hands out a brand new
+  // CfgFile to load into); push here too, so this test doesn't inherit
+  // leftover keys from another test's config file.
+  push_config_state();
+  set_config_file("_has_config_value.ini");
+
+  EXPECT_FALSE(has_config_value("A", "a"));
+
+  set_config_bool("A", "a", true);
+  EXPECT_TRUE(has_config_value("A", "a"));
+
+  // A saved empty string is still a *present* value.
+  set_config_string("A", "b", "");
+  EXPECT_TRUE(has_config_value("A", "b"));
+
+  // A different key/section than what was set must still read as absent.
+  EXPECT_FALSE(has_config_value("A", "c"));
+  EXPECT_FALSE(has_config_value("B", "a"));
+
+  pop_config_state();
+}
+
 TEST(IniFile, PushPop)
 {
   if (base::is_file("_a.ini")) base::delete_file("_a.ini");

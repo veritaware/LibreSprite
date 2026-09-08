@@ -54,6 +54,15 @@ function(find_tests dir)
     set(entrypoint GTest::gtest)
   endif()
 
+  # Tests that link app-lib may reach for its gen-generated headers (e.g.
+  # pref.xml.h, pulled in by app/pref/preferences.h) - remember that before
+  # the WHOLE_ARCHIVE rewrite below removes "app-lib" from deps.
+  if("app-lib" IN_LIST deps)
+    set(_needs_app_lib TRUE)
+  else()
+    set(_needs_app_lib FALSE)
+  endif()
+
   # app-lib and script-lib both rely on static initializers (the FileFormat /
   # command injection registry, and the Engine / InternalScriptObject / qjs
   # EngineDelegate registrations respectively) that a normal static link
@@ -90,6 +99,15 @@ function(find_tests dir)
 
     if(NOT _linked_with_she EQUAL -1)
       target_compile_definitions(${testname} PRIVATE LINKED_WITH_SHE)
+    endif()
+
+    if(_needs_app_lib)
+      target_include_directories(${testname} PRIVATE ${APP_INCLUDE_DIR})
+      # app-lib is only reached through the WHOLE_ARCHIVE generator
+      # expression in ${prelibs} below, which alone doesn't force ninja to
+      # finish app-lib's own custom-command-generated headers before this
+      # target's sources (which may #include one of them) start compiling.
+      add_dependencies(${testname} app-lib)
     endif()
 
     target_link_libraries(${testname} PRIVATE

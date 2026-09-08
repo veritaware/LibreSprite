@@ -1,5 +1,5 @@
-// Aseprite
-// Copyright (C) 2001-2016  David Capello
+// Aseprite  | Copyright (C) 2001-2016 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -54,8 +54,13 @@ namespace app {
 
   // Generic get/set_config_value functions
 
+  // Returns true when [section].name has a saved value, false when it's
+  // absent. (Previously inverted: it returned true for *absent* keys,
+  // silently flipping the meaning of every `!has_config_value(...)` call
+  // site - see main_window.cpp's DPI-default guards, which already assumed
+  // the correct "true means present" semantics implemented here.)
   inline bool has_config_value(const char* section, const char* name) {
-    return get_config_string(section, name, nullptr) == nullptr;
+    return get_config_string(section, name, nullptr) != nullptr;
   }
 
   inline const char* get_config_value(const char* section, const char* name, const char* value) {
