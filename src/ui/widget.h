@@ -1,5 +1,6 @@
-// Aseprite    | Copyright (C) 2001-2016  David Capello
-// LibreSprite | Copyright (C)      2021  LibreSprite contributors
+// Aseprite    | Copyright (C) 2001-2016 David Capello
+// LibreSprite | Copyright (C) 2021      LibreSprite contributors
+// Besprited   | Copyright (C) 2026      Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -393,6 +394,12 @@ namespace ui {
     virtual void onDeselect();
     virtual void onSetText();
     virtual void onSetBgColor();
+
+    // Called by textInt()/textDouble() when text() can't be parsed as a
+    // math expression. Default implementation blocks on a ui::Alert, which
+    // requires a live, message-pumping ui::Manager - override this (e.g. in
+    // a headless test) to observe/record the error without it.
+    virtual void onEvalError(const std::string& message) const;
 
   private:
     void removeChild(WidgetsList::iterator& it);
