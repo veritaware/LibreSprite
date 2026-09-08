@@ -56,6 +56,8 @@ list(APPEND generated_files ${output_fn})
 
 # Directory where generated files by "gen" utility will stay.
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+set(APP_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}
+    CACHE INTERNAL "Extra include directory for app-lib's gen-generated headers (pref.xml.h, *.xml.h, skin.xml.h)")
 
 if(GEN_ONLY)
   add_library(app-lib ${generated_files})
