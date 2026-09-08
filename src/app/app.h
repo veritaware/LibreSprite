@@ -1,5 +1,6 @@
-// Aseprite    | Copyright (C) 2001-2016  David Capello
-// LibreSprite | Copyright (C) 2021       LibreSprite contributors
+// Aseprite    | Copyright (C) 2001-2016 David Capello
+// LibreSprite | Copyright (C) 2021      LibreSprite contributors
+// Besprited   | Copyright (C) 2026      Veritaware
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License version 2 as
@@ -65,6 +66,15 @@ namespace app {
     // scripts.
     void initialize(const AppOptions& options);
     void run();
+
+    // Constructs just the CoreModules (ConfigModule + Preferences) that
+    // App::instance()->preferences() and other coreModules-backed code
+    // (e.g. DocumentUndo::add()'s allowNonlinearHistory() check) need to
+    // find a real object instead of null-dereferencing - without pulling in
+    // everything else initialize() does (tool/command/UI modules, palette
+    // loading, an optional ui::UISystem...). For tests that only need a
+    // live App::instance() to satisfy that, not a running application.
+    void initializeCoreModulesForTesting();
 
     tools::ToolBox* toolBox() const;
     tools::Tool* activeTool() const;

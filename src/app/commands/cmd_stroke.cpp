@@ -8,6 +8,8 @@
 #include "config.h"
 #endif
 
+#include "app/commands/cmd_stroke.h"
+
 #include "app/color.h"
 #include "app/color_utils.h"
 #include "app/commands/command.h"
@@ -37,12 +39,10 @@ using namespace doc;
 class StrokeWindow : public app::gen::Stroke {
 };
 
-namespace {
-
 // Paints a pixel-perfect (non anti-aliased) band of the given width along
 // the edge of the current selection, positioned inside/outside/centered on
 // the selection edge, with the given color/opacity. Used by both Stroke and
-// Quick Stroke.
+// Quick Stroke. Declared in cmd_stroke.h.
 void stroke_mask(Context* context, const app::Color& color, int opacity,
                  int width, app::gen::StrokePosition position,
                  const char* actionName)
@@ -155,8 +155,6 @@ void stroke_mask(Context* context, const app::Color& color, int opacity,
 
   update_screen_for_document(document);
 }
-
-} // anonymous namespace
 
 class StrokeCommand : public Command {
 public:

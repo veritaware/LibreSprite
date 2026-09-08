@@ -139,6 +139,12 @@ App::App()
   m_instance = this;
 }
 
+void App::initializeCoreModulesForTesting()
+{
+  if (!m_coreModules)
+    m_coreModules = std::make_unique<CoreModules>();
+}
+
 void App::initialize(const AppOptions& options)
 {
   m_isGui = options.startUI();
