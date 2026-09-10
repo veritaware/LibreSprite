@@ -97,9 +97,20 @@ namespace ui {
     bool hasText() const { return hasFlags(HAS_TEXT); }
 
     const std::string& text() const { return m_text; }
+
+    // Evaluate text() as a math expression. These are plain getters that
+    // callers poll freely - including on every keystroke, to drive a live
+    // preview - so they never report a parse failure to the user and never
+    // invent a value for one: text that doesn't evaluate yields the last
+    // value that did (see hasLastEvalText()), or 0 if there isn't one.
     int textInt() const;
     double textDouble() const;
+
     int textLength() const;
+
+    // True once textInt()/textDouble() has been called on this widget at
+    // all, i.e. some code does read it as a number rather than as text.
+    bool isTextReadAsNumber() const { return m_textReadAsNumber; }
 
     void setI18N();
     void setI18N(std::string_view i18n);
@@ -396,12 +407,21 @@ namespace ui {
     virtual void onSetBgColor();
 
     // Called by textInt()/textDouble() when text() can't be parsed as a
-    // math expression. Default implementation blocks on a ui::Alert, which
-    // requires a live, message-pumping ui::Manager - override this (e.g. in
-    // a headless test) to observe/record the error without it.
+    // math expression. Notification only - the caller uses
+    // onEvalFallback() regardless, so this must not block or show modal
+    // UI: it runs on every keystroke of a live-updating entry, and may run
+    // long after the window owning the widget has been closed.
     virtual void onEvalError(const std::string& message) const;
 
+    // The value textInt()/textDouble() return when text() doesn't
+    // evaluate. Plain widgets have nothing better to offer than zero;
+    // Entry keeps the last value it held that did evaluate.
+    virtual double onEvalFallback() const { return 0.0; }
+
   private:
+    // Shared back end of textInt()/textDouble().
+    double evalText() const;
+
     void removeChild(WidgetsList::iterator& it);
     void paint(Graphics* graphics, const gfx::Region& drawRegion);
     bool paintEvent(Graphics* graphics);
@@ -412,6 +432,10 @@ namespace ui {
     Theme* m_theme;              // Widget's theme
     std::string m_text;          // Widget text
     std::string m_i18n;          // Text before translation
+
+    // Set by textInt()/textDouble(), so a widget can tell whether anything
+    // reads it as a number. Mutable because both are const getters.
+    mutable bool m_textReadAsNumber = false;
     mutable std::shared_ptr<she::Font> m_font;   // Cached font returned by the theme
     gfx::Color m_bgColor;        // Background color
     gfx::Rect m_bounds;

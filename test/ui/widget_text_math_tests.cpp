@@ -17,9 +17,8 @@ using namespace ui;
 namespace {
 
 // Widget::textInt()/textDouble() report a parse failure through the
-// overridable onEvalError() hook - the default implementation blocks on a
-// ui::Alert, which needs a live, message-pumping ui::Manager, so tests
-// override it instead to record the failure headlessly.
+// overridable onEvalError() hook - the default implementation does nothing,
+// so tests override it to observe that the failure was detected at all.
 class RecordingWidget : public Widget {
 public:
   mutable int errorCount = 0;
@@ -31,6 +30,16 @@ protected:
     ++errorCount;
     lastError = message;
   }
+};
+
+// A widget that has something better to fall back on than zero, the way
+// ui::Entry does with the last text it held that evaluated.
+class FallbackWidget : public RecordingWidget {
+public:
+  double fallback = 0.0;
+
+protected:
+  double onEvalFallback() const override { return fallback; }
 };
 
 } // namespace
@@ -51,15 +60,6 @@ TEST(WidgetTextMath, TextIntEvaluatesAnExpression)
   EXPECT_EQ(0, w.errorCount);
 }
 
-TEST(WidgetTextMath, TextIntOnUnparseableTextReportsTheErrorAndReturnsOne)
-{
-  RecordingWidget w;
-  w.setText("not a number");
-  EXPECT_EQ(1, w.textInt());
-  EXPECT_EQ(1, w.errorCount);
-  EXPECT_FALSE(w.lastError.empty());
-}
-
 TEST(WidgetTextMath, TextIntClampsAResultOutsideIntRangeWithoutOverflow)
 {
   RecordingWidget w;
@@ -68,6 +68,19 @@ TEST(WidgetTextMath, TextIntClampsAResultOutsideIntRangeWithoutOverflow)
   EXPECT_EQ(0, w.errorCount);
 
   w.setText("-99999999999");
+  EXPECT_EQ(INT_MIN, w.textInt());
+}
+
+// Clamping has to happen in double space; converting an out-of-range
+// double straight to an integer type is undefined behaviour.
+TEST(WidgetTextMath, HugeResultClampsWithoutUndefinedConversion)
+{
+  RecordingWidget w;
+  w.setText("9999999999*9999999999"); // ~1e20, past LONG_MAX
+  EXPECT_EQ(INT_MAX, w.textInt());
+  EXPECT_EQ(0, w.errorCount);
+
+  w.setText("-9999999999*9999999999");
   EXPECT_EQ(INT_MIN, w.textInt());
 }
 
@@ -86,10 +99,66 @@ TEST(WidgetTextMath, TextDoubleRoundsToThreeDecimals)
   EXPECT_DOUBLE_EQ(0.333, w.textDouble());
 }
 
-TEST(WidgetTextMath, TextDoubleOnUnparseableTextReportsTheErrorAndReturnsOne)
+// Text that doesn't evaluate never invents a number: a plain widget has
+// nothing to fall back on, so it reads as zero.
+TEST(WidgetTextMath, UnparseableTextReadsAsTheFallbackValue)
 {
   RecordingWidget w;
-  w.setText("???");
-  EXPECT_DOUBLE_EQ(1.0, w.textDouble());
+  w.setText("not a number");
+  EXPECT_EQ(0, w.textInt());
   EXPECT_EQ(1, w.errorCount);
+  EXPECT_FALSE(w.lastError.empty());
+
+  EXPECT_DOUBLE_EQ(0.0, w.textDouble());
+}
+
+TEST(WidgetTextMath, UnparseableTextUsesTheWidgetsOwnFallback)
+{
+  FallbackWidget w;
+  w.fallback = 300.0;
+
+  w.setText("-"); // start of a negative number
+  EXPECT_EQ(300, w.textInt());
+  EXPECT_DOUBLE_EQ(300.0, w.textDouble());
+  EXPECT_EQ(2, w.errorCount);
+
+  w.setText("-25"); // ...finished
+  EXPECT_EQ(-25, w.textInt());
+  EXPECT_EQ(2, w.errorCount);
+}
+
+// A result that parses but isn't a usable number falls back too. evalmath
+// rejects most division by zero itself, so this guards the rest.
+TEST(WidgetTextMath, NonFiniteResultIsTreatedAsAFailedEvaluation)
+{
+  FallbackWidget w;
+  w.fallback = 10.0;
+
+  w.setText("1/0");
+  EXPECT_EQ(10, w.textInt());
+  EXPECT_EQ(1, w.errorCount);
+
+  w.setText("0/0");
+  EXPECT_EQ(10, w.textInt());
+}
+
+// isTextReadAsNumber() is what tells an Entry it is a numeric field at
+// all, so it must stay false for text nothing reads as a number.
+TEST(WidgetTextMath, IsTextReadAsNumberStaysFalseUntilTextIsReadAsANumber)
+{
+  RecordingWidget w;
+  w.setText("123");
+  EXPECT_FALSE(w.isTextReadAsNumber());
+  EXPECT_EQ(123, w.textInt());
+  EXPECT_TRUE(w.isTextReadAsNumber());
+}
+
+// It is set even when the read fails - the read is what makes the widget
+// numeric, not whether that particular text happened to parse.
+TEST(WidgetTextMath, IsTextReadAsNumberIsSetEvenWhenTheTextDoesNotParse)
+{
+  RecordingWidget w;
+  w.setText("-");
+  EXPECT_EQ(0, w.textInt());
+  EXPECT_TRUE(w.isTextReadAsNumber());
 }

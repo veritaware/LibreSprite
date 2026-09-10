@@ -1,5 +1,6 @@
-// Aseprite UI Library
-// Copyright (C) 2001-2013, 2015  David Capello
+// UI Library
+// Aseprite  | Copyright (C) 2001-2015 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -53,6 +54,12 @@ namespace ui {
     void onPaint(PaintEvent& ev) override;
     void onSetText() override;
 
+    // If this entry is read as a math expression and what it currently
+    // holds no longer evaluates, put back the last text that did.
+    void restoreLastValidText();
+
+    double onEvalFallback() const override;
+
     // New Events
     virtual void onChange();
     virtual gfx::Rect onGetEntryTextBounds() const;
@@ -97,6 +104,15 @@ namespace ui {
     bool m_recent_focused;
     bool m_lock_selection;
     bool m_got_focus_message;
+
+    // The last text this entry held that evaluated as a math expression,
+    // and what it evaluated to. Tracked on every text change - including
+    // the one that fills the field when its window is built - so it does
+    // not depend on when, or whether, anything reads the entry.
+    std::string m_validText;
+    double m_validValue;
+    bool m_hasValidText;
+
     std::string m_suffix;
   };
 

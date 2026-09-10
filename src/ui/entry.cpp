@@ -1,5 +1,6 @@
-// Aseprite UI Library
-// Copyright (C) 2001-2016  David Capello
+// UI Library
+// Aseprite  | Copyright (C) 2001-2016 David Capello
+// Besprited | Copyright (C) 2026      Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -13,6 +14,7 @@
 #include "base/bind.h"
 #include "base/string.h"
 #include "clip/clip.h"
+#include "evalmath/evalmath.h"
 #include "she/font.h"
 #include "she/keys.h"
 #include "ui/manager.h"
@@ -44,6 +46,8 @@ Entry::Entry(std::size_t maxsize, const char* format, ...)
   , m_recent_focused(false)
   , m_lock_selection(false)
   , m_got_focus_message(false)
+  , m_validValue(0.0)
+  , m_hasValidText(false)
 {
   enableFlags(CTRL_RIGHT_CLICK);
 
@@ -230,6 +234,8 @@ bool Entry::onProcessMessage(Message* msg)
     }
 
     case kFocusLeaveMessage:
+      restoreLastValidText();
+
       invalidate();
 
       m_timer.stop();
@@ -476,6 +482,17 @@ void Entry::onSetText()
 {
   Widget::onSetText();
 
+  // Remember this text if it evaluates, so restoreLastValidText() has
+  // something to go back to. This runs for every text change, so the value
+  // a window fills the field with when it is built counts too - waiting
+  // until something reads the entry as a number would miss it, and reading
+  // is up to the window.
+  if (auto val = evalmath::eval(text())) {
+    m_validText = text();
+    m_validValue = val.value();
+    m_hasValidText = true;
+  }
+
   int textlen = textLength();
   if (m_caret >= 0 && m_caret > textlen)
     m_caret = textlen;
@@ -484,6 +501,34 @@ void Entry::onSetText()
 void Entry::onChange()
 {
   Change();
+}
+
+double Entry::onEvalFallback() const
+{
+  return m_hasValidText ? m_validValue : 0.0;
+}
+
+void Entry::restoreLastValidText()
+{
+  // Only fields something actually reads as a number (see
+  // Widget::isTextReadAsNumber()) are validated this way - a plain text
+  // entry is never touched, whatever it happens to contain.
+  if (!isTextReadAsNumber() || !m_hasValidText)
+    return;
+
+  // What's in the field still evaluates, so there is nothing to put right.
+  if (text() == m_validText || evalmath::eval(text()))
+    return;
+
+  // It doesn't: the user left behind something half-typed, like the lone
+  // "-" of a negative number. Put the last text that evaluated back, so
+  // the field can't be left showing something that counts as nothing.
+  // By value: setText() feeds onSetText(), which rewrites m_validText.
+  const std::string valid = m_validText;
+
+  // onSetText() clamps the caret into the new, shorter text for us.
+  setText(valid);
+  onChange();
 }
 
 gfx::Rect Entry::onGetEntryTextBounds() const
