@@ -149,12 +149,32 @@ void Widget::onEvalError(const std::string& message) const
   ui::Alert::show("Error evaluating expression  <<%s||&OK", message.c_str());
 }
 
+namespace {
+  thread_local int g_evalErrorSilenceDepth = 0;
+}
+
+Widget::ScopedEvalErrorSilence::ScopedEvalErrorSilence()
+{
+  ++g_evalErrorSilenceDepth;
+}
+
+Widget::ScopedEvalErrorSilence::~ScopedEvalErrorSilence()
+{
+  --g_evalErrorSilenceDepth;
+}
+
+bool Widget::isEvalErrorSilenced()
+{
+  return g_evalErrorSilenceDepth > 0;
+}
+
 int Widget::textInt() const
 {
   auto val = evalmath::eval(m_text);
   if(!val)
   {
-    onEvalError(val.error());
+    if (!isEvalErrorSilenced())
+      onEvalError(val.error());
     return 1;
   }
 
@@ -166,7 +186,8 @@ double Widget::textDouble() const
   auto val = evalmath::eval(m_text);
   if(!val)
   {
-    onEvalError(val.error());
+    if (!isEvalErrorSilenced())
+      onEvalError(val.error());
     return 1.0;
   }
   return std::round(val.value() * 1000.0) / 1000.0;

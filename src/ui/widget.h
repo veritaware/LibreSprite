@@ -101,6 +101,22 @@ namespace ui {
     double textDouble() const;
     int textLength() const;
 
+    // While an instance of this lives on the stack, a failed
+    // textInt()/textDouble() evaluation is swallowed silently instead of
+    // being reported through onEvalError(). Used to avoid popping an error
+    // Alert on every keystroke of a live-updating entry (e.g. a dialog
+    // preview) while the user is still in the middle of typing an
+    // expression - the error still surfaces when the value is read on
+    // commit, outside of any live-change notification.
+    class ScopedEvalErrorSilence {
+    public:
+      ScopedEvalErrorSilence();
+      ~ScopedEvalErrorSilence();
+      ScopedEvalErrorSilence(const ScopedEvalErrorSilence&) = delete;
+      ScopedEvalErrorSilence& operator=(const ScopedEvalErrorSilence&) = delete;
+    };
+    static bool isEvalErrorSilenced();
+
     void setI18N();
     void setI18N(std::string_view i18n);
     void setText(const std::string& text);

@@ -93,3 +93,39 @@ TEST(WidgetTextMath, TextDoubleOnUnparseableTextReportsTheErrorAndReturnsOne)
   EXPECT_DOUBLE_EQ(1.0, w.textDouble());
   EXPECT_EQ(1, w.errorCount);
 }
+
+TEST(WidgetTextMath, ScopedEvalErrorSilenceSwallowsTheErrorButKeepsTheFallback)
+{
+  RecordingWidget w;
+  w.setText("-"); // a half-typed negative number
+
+  {
+    Widget::ScopedEvalErrorSilence silence;
+    EXPECT_EQ(1, w.textInt());
+    EXPECT_DOUBLE_EQ(1.0, w.textDouble());
+    EXPECT_EQ(0, w.errorCount);
+  }
+
+  // Once the guard is gone the error surfaces again (e.g. on commit).
+  EXPECT_EQ(1, w.textInt());
+  EXPECT_EQ(1, w.errorCount);
+}
+
+TEST(WidgetTextMath, ScopedEvalErrorSilenceNestsAndRestores)
+{
+  RecordingWidget w;
+  w.setText("not a number");
+
+  {
+    Widget::ScopedEvalErrorSilence outer;
+    {
+      Widget::ScopedEvalErrorSilence inner;
+      EXPECT_TRUE(Widget::isEvalErrorSilenced());
+      w.textInt();
+    }
+    EXPECT_TRUE(Widget::isEvalErrorSilenced());
+    w.textInt();
+  }
+  EXPECT_FALSE(Widget::isEvalErrorSilenced());
+  EXPECT_EQ(0, w.errorCount);
+}

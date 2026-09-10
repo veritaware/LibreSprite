@@ -1,5 +1,6 @@
 // Aseprite UI Library
 // Copyright (C) 2001-2016  David Capello
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -483,6 +484,12 @@ void Entry::onSetText()
 
 void Entry::onChange()
 {
+  // Live-change subscribers commonly read textInt()/textDouble() to update
+  // a preview; while the user is still typing (e.g. a lone "-" before a
+  // negative number, or a trailing operator) the expression is not yet
+  // valid, and we must not pop an error Alert on every keystroke. The
+  // error still surfaces when the value is read on commit.
+  Widget::ScopedEvalErrorSilence noAlertWhileTyping;
   Change();
 }
 
