@@ -15,6 +15,9 @@ Besprited is a free and open source program for creating and animating 2D sprite
 * Several file types supported for your sprites and animations.
 
 \
+![Besprited Screenshot](docs/screenshot.png)
+
+\
 `Note:` this project makes use of AI tooling to some degree. You can read more about it in
 [AI_USAGE.md](AI_USAGE.md)
 
