@@ -14,6 +14,7 @@
 #include "base/bind.h"
 #include "base/string.h"
 #include "clip/clip.h"
+#include "evalmath/evalmath.h"
 #include "she/font.h"
 #include "she/keys.h"
 #include "ui/manager.h"
@@ -205,6 +206,7 @@ bool Entry::onProcessMessage(Message* msg)
 
     case kFocusEnterMessage: {
       m_got_focus_message = true;
+      rememberTextForRestore();
       View* view = View::getView(this);
       gfx::Rect rect = view ? view->viewportBounds() : bounds();
       int scale = 2*guiscale();
@@ -231,6 +233,8 @@ bool Entry::onProcessMessage(Message* msg)
     }
 
     case kFocusLeaveMessage:
+      restoreLastEvalText();
+
       invalidate();
 
       m_timer.stop();
@@ -484,13 +488,40 @@ void Entry::onSetText()
 
 void Entry::onChange()
 {
-  // Live-change subscribers commonly read textInt()/textDouble() to update
-  // a preview; while the user is still typing (e.g. a lone "-" before a
-  // negative number, or a trailing operator) the expression is not yet
-  // valid, and we must not pop an error Alert on every keystroke. The
-  // error still surfaces when the value is read on commit.
-  Widget::ScopedEvalErrorSilence noAlertWhileTyping;
   Change();
+}
+
+void Entry::rememberTextForRestore()
+{
+  m_textOnFocusEnter = text();
+}
+
+void Entry::restoreLastEvalText()
+{
+  // Only fields something actually reads as a number (see
+  // Widget::isTextReadAsNumber()) are validated this way - a plain text
+  // entry is never touched, whatever it happens to contain.
+  if (!isTextReadAsNumber())
+    return;
+
+  // What's typed still evaluates, so it stands as the known-good text.
+  if (evalmath::eval(text()))
+    return;
+
+  // It doesn't: the user left behind something half-typed, like the lone
+  // "-" of a negative number. Fall back to the last text that evaluated,
+  // or - if nothing has yet, because editing went wrong on the very first
+  // keystroke - to whatever the field held when they started typing.
+  // By value: setText() below overwrites the member this would alias.
+  const std::string good =
+    hasLastEvalText() ? lastEvalText() : m_textOnFocusEnter;
+
+  if (good.empty() || good == text() || !evalmath::eval(good))
+    return;
+
+  // onSetText() clamps the caret into the new, shorter text for us.
+  setText(good);
+  onChange();
 }
 
 gfx::Rect Entry::onGetEntryTextBounds() const

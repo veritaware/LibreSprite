@@ -1,5 +1,6 @@
 // Aseprite UI Library
 // Copyright (C) 2001-2013, 2015  David Capello
+// Besprited | Copyright (C) 2026 Veritaware
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -53,6 +54,14 @@ namespace ui {
     void onPaint(PaintEvent& ev) override;
     void onSetText() override;
 
+    // Snapshot the value the user is about to edit, as the last resort for
+    // restoreLastEvalText(). Called when this entry gains focus.
+    void rememberTextForRestore();
+
+    // If this entry is read as a math expression and what it currently
+    // holds no longer evaluates, put back the last text that did.
+    void restoreLastEvalText();
+
     // New Events
     virtual void onChange();
     virtual gfx::Rect onGetEntryTextBounds() const;
@@ -97,6 +106,10 @@ namespace ui {
     bool m_recent_focused;
     bool m_lock_selection;
     bool m_got_focus_message;
+
+    // text() as it was when this entry last gained focus, i.e. the value
+    // the user started editing from. Used by restoreLastEvalText().
+    std::string m_textOnFocusEnter;
     std::string m_suffix;
   };
 

@@ -97,25 +97,25 @@ namespace ui {
     bool hasText() const { return hasFlags(HAS_TEXT); }
 
     const std::string& text() const { return m_text; }
+
+    // Evaluate text() as a math expression. These are plain getters that
+    // callers poll freely - including on every keystroke, to drive a live
+    // preview - so they never report a parse failure to the user and never
+    // invent a value for one: text that doesn't evaluate yields the last
+    // value that did (see hasLastEvalText()), or 0 if there isn't one.
     int textInt() const;
     double textDouble() const;
+
     int textLength() const;
 
-    // While an instance of this lives on the stack, a failed
-    // textInt()/textDouble() evaluation is swallowed silently instead of
-    // being reported through onEvalError(). Used to avoid popping an error
-    // Alert on every keystroke of a live-updating entry (e.g. a dialog
-    // preview) while the user is still in the middle of typing an
-    // expression - the error still surfaces when the value is read on
-    // commit, outside of any live-change notification.
-    class ScopedEvalErrorSilence {
-    public:
-      ScopedEvalErrorSilence();
-      ~ScopedEvalErrorSilence();
-      ScopedEvalErrorSilence(const ScopedEvalErrorSilence&) = delete;
-      ScopedEvalErrorSilence& operator=(const ScopedEvalErrorSilence&) = delete;
-    };
-    static bool isEvalErrorSilenced();
+    // True once textInt()/textDouble() has been called on this widget at
+    // all, i.e. some code does read it as a number rather than as text.
+    bool isTextReadAsNumber() const { return m_textReadAsNumber; }
+
+    // True once one of those calls actually evaluated something;
+    // lastEvalText() is the text() that produced the last usable value.
+    bool hasLastEvalText() const { return m_hasLastEval; }
+    const std::string& lastEvalText() const { return m_lastEvalText; }
 
     void setI18N();
     void setI18N(std::string_view i18n);
@@ -412,12 +412,16 @@ namespace ui {
     virtual void onSetBgColor();
 
     // Called by textInt()/textDouble() when text() can't be parsed as a
-    // math expression. Default implementation blocks on a ui::Alert, which
-    // requires a live, message-pumping ui::Manager - override this (e.g. in
-    // a headless test) to observe/record the error without it.
+    // math expression. Notification only - the caller falls back to
+    // lastEvalText()'s value regardless, so this must not block or show
+    // modal UI: it runs on every keystroke of a live-updating entry, and
+    // may run long after the window owning the widget has been closed.
     virtual void onEvalError(const std::string& message) const;
 
   private:
+    // Shared back end of textInt()/textDouble().
+    double evalText() const;
+
     void removeChild(WidgetsList::iterator& it);
     void paint(Graphics* graphics, const gfx::Region& drawRegion);
     bool paintEvent(Graphics* graphics);
@@ -428,6 +432,14 @@ namespace ui {
     Theme* m_theme;              // Widget's theme
     std::string m_text;          // Widget text
     std::string m_i18n;          // Text before translation
+
+    // Last text()/value pair that textInt()/textDouble() managed to
+    // evaluate, used as their fallback when the current text doesn't
+    // parse. Mutable because both are const getters.
+    mutable std::string m_lastEvalText;
+    mutable double m_lastEvalValue = 0.0;
+    mutable bool m_hasLastEval = false;
+    mutable bool m_textReadAsNumber = false;
     mutable std::shared_ptr<she::Font> m_font;   // Cached font returned by the theme
     gfx::Color m_bgColor;        // Background color
     gfx::Rect m_bounds;

@@ -21,7 +21,6 @@
 #include "she/font.h"
 #include "she/surface.h"
 #include "she/system.h"
-#include "ui/alert.h"
 #include "ui/init_theme_event.h"
 #include "ui/intern.h"
 #include "ui/layout_io.h"
@@ -39,8 +38,10 @@
 #include "ui/window.h"
 #include "evalmath/evalmath.h"
 
+#include <algorithm>
 #include <cctype>
 #include <climits>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -144,53 +145,53 @@ void Widget::initTheme()
   onInitTheme(ev);
 }
 
-void Widget::onEvalError(const std::string& message) const
+void Widget::onEvalError(const std::string& /*message*/) const
 {
-  ui::Alert::show("Error evaluating expression  <<%s||&OK", message.c_str());
+  // Nothing by default. This used to raise a modal ui::Alert, but
+  // textInt()/textDouble() are getters that dialogs poll on every
+  // keystroke to refresh a preview, and again after their window has
+  // closed to read the final values - so a half-typed expression popped an
+  // alert mid-word, and a bad one popped it once the field could no longer
+  // be corrected. Entry reverts to the last value that parsed instead.
 }
 
-namespace {
-  thread_local int g_evalErrorSilenceDepth = 0;
-}
-
-Widget::ScopedEvalErrorSilence::ScopedEvalErrorSilence()
+// Evaluates m_text, caching the result as the fallback for whatever is
+// typed next. Returns the last value that parsed (0 if none ever did) when
+// m_text doesn't parse, so a half-typed expression can never inject an
+// arbitrary number into whatever the caller drives.
+double Widget::evalText() const
 {
-  ++g_evalErrorSilenceDepth;
-}
+  m_textReadAsNumber = true;
 
-Widget::ScopedEvalErrorSilence::~ScopedEvalErrorSilence()
-{
-  --g_evalErrorSilenceDepth;
-}
+  auto val = evalmath::eval(m_text);
+  if (!val) {
+    onEvalError(val.error());
+    return m_lastEvalValue;
+  }
 
-bool Widget::isEvalErrorSilenced()
-{
-  return g_evalErrorSilenceDepth > 0;
+  // evalmath doesn't reject division by zero, so an expression can parse
+  // and still come back as inf/NaN. Those aren't usable results either.
+  if (!std::isfinite(val.value())) {
+    onEvalError("result is not a finite number");
+    return m_lastEvalValue;
+  }
+
+  m_lastEvalText = m_text;
+  m_lastEvalValue = val.value();
+  m_hasLastEval = true;
+  return val.value();
 }
 
 int Widget::textInt() const
 {
-  auto val = evalmath::eval(m_text);
-  if(!val)
-  {
-    if (!isEvalErrorSilenced())
-      onEvalError(val.error());
-    return 1;
-  }
-
-  return static_cast<int>(std::clamp<long>(val.value(), INT_MIN, INT_MAX));
+  // Clamped as a double: converting an out-of-range double straight to an
+  // integer type is undefined behaviour.
+  return static_cast<int>(std::clamp<double>(evalText(), INT_MIN, INT_MAX));
 }
 
 double Widget::textDouble() const
 {
-  auto val = evalmath::eval(m_text);
-  if(!val)
-  {
-    if (!isEvalErrorSilenced())
-      onEvalError(val.error());
-    return 1.0;
-  }
-  return std::round(val.value() * 1000.0) / 1000.0;
+  return std::round(evalText() * 1000.0) / 1000.0;
 }
 
 int Widget::textLength() const
