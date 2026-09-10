@@ -112,11 +112,6 @@ namespace ui {
     // all, i.e. some code does read it as a number rather than as text.
     bool isTextReadAsNumber() const { return m_textReadAsNumber; }
 
-    // True once one of those calls actually evaluated something;
-    // lastEvalText() is the text() that produced the last usable value.
-    bool hasLastEvalText() const { return m_hasLastEval; }
-    const std::string& lastEvalText() const { return m_lastEvalText; }
-
     void setI18N();
     void setI18N(std::string_view i18n);
     void setText(const std::string& text);
@@ -412,11 +407,16 @@ namespace ui {
     virtual void onSetBgColor();
 
     // Called by textInt()/textDouble() when text() can't be parsed as a
-    // math expression. Notification only - the caller falls back to
-    // lastEvalText()'s value regardless, so this must not block or show
-    // modal UI: it runs on every keystroke of a live-updating entry, and
-    // may run long after the window owning the widget has been closed.
+    // math expression. Notification only - the caller uses
+    // onEvalFallback() regardless, so this must not block or show modal
+    // UI: it runs on every keystroke of a live-updating entry, and may run
+    // long after the window owning the widget has been closed.
     virtual void onEvalError(const std::string& message) const;
+
+    // The value textInt()/textDouble() return when text() doesn't
+    // evaluate. Plain widgets have nothing better to offer than zero;
+    // Entry keeps the last value it held that did evaluate.
+    virtual double onEvalFallback() const { return 0.0; }
 
   private:
     // Shared back end of textInt()/textDouble().
@@ -433,12 +433,8 @@ namespace ui {
     std::string m_text;          // Widget text
     std::string m_i18n;          // Text before translation
 
-    // Last text()/value pair that textInt()/textDouble() managed to
-    // evaluate, used as their fallback when the current text doesn't
-    // parse. Mutable because both are const getters.
-    mutable std::string m_lastEvalText;
-    mutable double m_lastEvalValue = 0.0;
-    mutable bool m_hasLastEval = false;
+    // Set by textInt()/textDouble(), so a widget can tell whether anything
+    // reads it as a number. Mutable because both are const getters.
     mutable bool m_textReadAsNumber = false;
     mutable std::shared_ptr<she::Font> m_font;   // Cached font returned by the theme
     gfx::Color m_bgColor;        // Background color

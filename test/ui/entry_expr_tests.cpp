@@ -16,26 +16,16 @@ using namespace ui;
 
 namespace {
 
-// Entry validates an expression on kFocusLeaveMessage - send one directly
-// instead of standing up a Manager to move focus around for real.
+// Entry puts a half-typed expression right on kFocusLeaveMessage - send
+// one directly instead of standing up a Manager to move focus for real.
 void loseFocus(Entry& entry)
 {
   Message msg(kFocusLeaveMessage);
   entry.sendMessage(&msg);
 }
 
-// Focus-enter can't be sent the same way: handling it also starts a blink
-// timer, talks to she and re-selects the text through the theme's font,
-// none of which exists in a headless test. The part that matters here is
-// the snapshot Entry takes of the value the user is about to edit.
-class TestEntry : public Entry {
-public:
-  using Entry::Entry;
-  void gainFocus() { rememberTextForRestore(); }
-};
-
-// Stands in for a dialog that reads an entry as a number on every edit to
-// refresh a live preview (Canvas Size, Sprite Size, Import Sprite Sheet...).
+// Stands in for a window that reads an entry as a number to refresh a live
+// preview (Canvas Size, Sprite Size, Import Sprite Sheet...).
 class PreviewReader {
 public:
   explicit PreviewReader(Entry& entry) : m_entry(entry)
@@ -73,17 +63,37 @@ TEST(EntryExpr, HalfTypedExpressionDoesNotMoveThePreviewValue)
   EXPECT_EQ(-25, preview.value);
 }
 
+// The case from the Canvas Size dialog. That window fills its border
+// fields with 0 when it is built but doesn't read them until something
+// changes, so the value to go back to has to come from the text itself,
+// not from a read.
+TEST(EntryExpr, FocusLeaveRestoresAValueNothingHadReadYet)
+{
+  Entry entry(32, "0"); // as the window fills it
+  PreviewReader preview(entry);
+
+  entry.setText("-");
+  preview.read(); // first read of all: the field is only now known numeric
+  EXPECT_EQ(0, preview.value);
+
+  loseFocus(entry);
+  EXPECT_EQ("0", entry.text());
+}
+
 TEST(EntryExpr, FocusLeaveRestoresTheLastTextThatEvaluated)
 {
   Entry entry(32, "0");
   PreviewReader preview(entry);
-  preview.read(); // the dialog reads it as a number => it's a numeric field
+  preview.read();
 
-  entry.setText("-");
+  entry.setText("-25");
+  preview.read();
+
+  entry.setText("-25*"); // trailing operator
   preview.read();
 
   loseFocus(entry);
-  EXPECT_EQ("0", entry.text());
+  EXPECT_EQ("-25", entry.text()); // not "0": the newer valid text wins
 }
 
 TEST(EntryExpr, FocusLeaveKeepsTextThatStillEvaluates)
@@ -106,16 +116,46 @@ TEST(EntryExpr, FocusLeaveNotifiesListenersAfterRestoringTheText)
   PreviewReader preview(entry);
   preview.read();
 
-  entry.setText("10+"); // trailing operator
-  int readsBeforeFocusLeave = preview.reads;
+  entry.setText("10+");
+  const int readsBefore = preview.reads;
 
   loseFocus(entry);
   EXPECT_EQ("10", entry.text());
-  EXPECT_GT(preview.reads, readsBeforeFocusLeave);
+  EXPECT_GT(preview.reads, readsBefore);
   EXPECT_EQ(10, preview.value);
 }
 
-// The revert only applies to entries something reads as a number. A plain
+// Repeated focus changes must not wear the restore value down - this is
+// what made the behaviour look random when it was snapshotted on
+// focus-enter instead of tracked on the text.
+TEST(EntryExpr, RepeatedFocusChangesKeepRestoringTheSameValue)
+{
+  Entry entry(32, "0");
+  PreviewReader preview(entry);
+  preview.read();
+
+  for (int i = 0; i < 5; ++i) {
+    entry.setText("-");
+    preview.read();
+    loseFocus(entry);
+    EXPECT_EQ("0", entry.text()) << "iteration " << i;
+  }
+}
+
+// A focus-leave with nothing wrong in the field must not disturb it.
+TEST(EntryExpr, FocusLeaveOnValidTextIsANoOp)
+{
+  Entry entry(32, "5");
+  PreviewReader preview(entry);
+  preview.read();
+
+  const int readsBefore = preview.reads;
+  loseFocus(entry);
+  EXPECT_EQ("5", entry.text());
+  EXPECT_EQ(readsBefore, preview.reads); // no spurious Change
+}
+
+// The restore only applies to entries something reads as a number. A plain
 // text entry must keep whatever the user typed, even if it happens to look
 // like a broken expression.
 TEST(EntryExpr, PlainTextEntryIsLeftAloneOnFocusLeave)
@@ -142,52 +182,18 @@ TEST(EntryExpr, NumericLookingTextEntryIsLeftAloneOnFocusLeave)
   EXPECT_EQ("abc", entry.text());
 }
 
-// The case from the Canvas Size dialog: the field opens on a valid value
-// that the dialog hasn't read yet, and the very first keystroke makes it
-// unparseable - so there is no previously evaluated text to go back to.
-// What the field held when editing started stands in for it.
-TEST(EntryExpr, FocusLeaveFallsBackToTheTextEditingStartedFrom)
+// An entry that has never held anything valid has nothing to restore, and
+// must not blank itself out trying.
+TEST(EntryExpr, EntryWithNoValidTextIsLeftAloneOnFocusLeave)
 {
-  TestEntry entry(32, "0");
+  Entry entry(32, "abc");
   PreviewReader preview(entry);
-
-  entry.gainFocus();
-
-  entry.setText("-"); // first keystroke, before anything evaluated
   preview.read();
-  EXPECT_EQ(0, preview.value); // no invented number reaches the preview
+  EXPECT_EQ(0, preview.value);
 
-  loseFocus(entry);
-  EXPECT_EQ("0", entry.text());
-}
-
-// A later good value wins over the one editing started from.
-TEST(EntryExpr, FocusLeavePrefersTheLastTextThatEvaluated)
-{
-  TestEntry entry(32, "5");
-  PreviewReader preview(entry);
-
-  entry.gainFocus();
-
-  entry.setText("7");
-  preview.read();
-  EXPECT_EQ(7, preview.value);
-
-  entry.setText("7+"); // trailing operator
+  entry.setText("def");
   preview.read();
 
   loseFocus(entry);
-  EXPECT_EQ("7", entry.text());
-}
-
-// Focus alone must not turn a text field into a numeric one.
-TEST(EntryExpr, FocusEnterDoesNotMakeAPlainTextEntryNumeric)
-{
-  TestEntry entry(32, "123");
-
-  entry.gainFocus();
-  entry.setText("abc");
-  loseFocus(entry);
-
-  EXPECT_EQ("abc", entry.text());
+  EXPECT_EQ("def", entry.text());
 }

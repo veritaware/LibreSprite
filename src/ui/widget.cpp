@@ -155,10 +155,9 @@ void Widget::onEvalError(const std::string& /*message*/) const
   // be corrected. Entry reverts to the last value that parsed instead.
 }
 
-// Evaluates m_text, caching the result as the fallback for whatever is
-// typed next. Returns the last value that parsed (0 if none ever did) when
-// m_text doesn't parse, so a half-typed expression can never inject an
-// arbitrary number into whatever the caller drives.
+// Evaluates m_text, falling back to onEvalFallback() when it doesn't
+// parse, so a half-typed expression can never inject an arbitrary number
+// into whatever the caller drives.
 double Widget::evalText() const
 {
   m_textReadAsNumber = true;
@@ -166,19 +165,16 @@ double Widget::evalText() const
   auto val = evalmath::eval(m_text);
   if (!val) {
     onEvalError(val.error());
-    return m_lastEvalValue;
+    return onEvalFallback();
   }
 
-  // evalmath doesn't reject division by zero, so an expression can parse
-  // and still come back as inf/NaN. Those aren't usable results either.
+  // evalmath doesn't reject every division by zero, so an expression can
+  // parse and still come back as inf/NaN. Those aren't usable either.
   if (!std::isfinite(val.value())) {
     onEvalError("result is not a finite number");
-    return m_lastEvalValue;
+    return onEvalFallback();
   }
 
-  m_lastEvalText = m_text;
-  m_lastEvalValue = val.value();
-  m_hasLastEval = true;
   return val.value();
 }
 

@@ -46,6 +46,8 @@ Entry::Entry(std::size_t maxsize, const char* format, ...)
   , m_recent_focused(false)
   , m_lock_selection(false)
   , m_got_focus_message(false)
+  , m_validValue(0.0)
+  , m_hasValidText(false)
 {
   enableFlags(CTRL_RIGHT_CLICK);
 
@@ -206,7 +208,6 @@ bool Entry::onProcessMessage(Message* msg)
 
     case kFocusEnterMessage: {
       m_got_focus_message = true;
-      rememberTextForRestore();
       View* view = View::getView(this);
       gfx::Rect rect = view ? view->viewportBounds() : bounds();
       int scale = 2*guiscale();
@@ -233,7 +234,7 @@ bool Entry::onProcessMessage(Message* msg)
     }
 
     case kFocusLeaveMessage:
-      restoreLastEvalText();
+      restoreLastValidText();
 
       invalidate();
 
@@ -481,6 +482,17 @@ void Entry::onSetText()
 {
   Widget::onSetText();
 
+  // Remember this text if it evaluates, so restoreLastValidText() has
+  // something to go back to. This runs for every text change, so the value
+  // a window fills the field with when it is built counts too - waiting
+  // until something reads the entry as a number would miss it, and reading
+  // is up to the window.
+  if (auto val = evalmath::eval(text())) {
+    m_validText = text();
+    m_validValue = val.value();
+    m_hasValidText = true;
+  }
+
   int textlen = textLength();
   if (m_caret >= 0 && m_caret > textlen)
     m_caret = textlen;
@@ -491,36 +503,31 @@ void Entry::onChange()
   Change();
 }
 
-void Entry::rememberTextForRestore()
+double Entry::onEvalFallback() const
 {
-  m_textOnFocusEnter = text();
+  return m_hasValidText ? m_validValue : 0.0;
 }
 
-void Entry::restoreLastEvalText()
+void Entry::restoreLastValidText()
 {
   // Only fields something actually reads as a number (see
   // Widget::isTextReadAsNumber()) are validated this way - a plain text
   // entry is never touched, whatever it happens to contain.
-  if (!isTextReadAsNumber())
+  if (!isTextReadAsNumber() || !m_hasValidText)
     return;
 
-  // What's typed still evaluates, so it stands as the known-good text.
-  if (evalmath::eval(text()))
+  // What's in the field still evaluates, so there is nothing to put right.
+  if (text() == m_validText || evalmath::eval(text()))
     return;
 
   // It doesn't: the user left behind something half-typed, like the lone
-  // "-" of a negative number. Fall back to the last text that evaluated,
-  // or - if nothing has yet, because editing went wrong on the very first
-  // keystroke - to whatever the field held when they started typing.
-  // By value: setText() below overwrites the member this would alias.
-  const std::string good =
-    hasLastEvalText() ? lastEvalText() : m_textOnFocusEnter;
-
-  if (good.empty() || good == text() || !evalmath::eval(good))
-    return;
+  // "-" of a negative number. Put the last text that evaluated back, so
+  // the field can't be left showing something that counts as nothing.
+  // By value: setText() feeds onSetText(), which rewrites m_validText.
+  const std::string valid = m_validText;
 
   // onSetText() clamps the caret into the new, shorter text for us.
-  setText(good);
+  setText(valid);
   onChange();
 }
 

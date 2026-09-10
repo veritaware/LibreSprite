@@ -32,6 +32,16 @@ protected:
   }
 };
 
+// A widget that has something better to fall back on than zero, the way
+// ui::Entry does with the last text it held that evaluated.
+class FallbackWidget : public RecordingWidget {
+public:
+  double fallback = 0.0;
+
+protected:
+  double onEvalFallback() const override { return fallback; }
+};
+
 } // namespace
 
 TEST(WidgetTextMath, TextIntParsesAPlainNumber)
@@ -61,6 +71,19 @@ TEST(WidgetTextMath, TextIntClampsAResultOutsideIntRangeWithoutOverflow)
   EXPECT_EQ(INT_MIN, w.textInt());
 }
 
+// Clamping has to happen in double space; converting an out-of-range
+// double straight to an integer type is undefined behaviour.
+TEST(WidgetTextMath, HugeResultClampsWithoutUndefinedConversion)
+{
+  RecordingWidget w;
+  w.setText("9999999999*9999999999"); // ~1e20, past LONG_MAX
+  EXPECT_EQ(INT_MAX, w.textInt());
+  EXPECT_EQ(0, w.errorCount);
+
+  w.setText("-9999999999*9999999999");
+  EXPECT_EQ(INT_MIN, w.textInt());
+}
+
 TEST(WidgetTextMath, TextDoubleParsesAPlainNumber)
 {
   RecordingWidget w;
@@ -76,10 +99,9 @@ TEST(WidgetTextMath, TextDoubleRoundsToThreeDecimals)
   EXPECT_DOUBLE_EQ(0.333, w.textDouble());
 }
 
-// A widget nothing has ever evaluated successfully has no value to fall
-// back on, so unparseable text reads as 0 rather than as some invented
-// number.
-TEST(WidgetTextMath, UnparseableTextWithNoPriorValueReadsAsZero)
+// Text that doesn't evaluate never invents a number: a plain widget has
+// nothing to fall back on, so it reads as zero.
+TEST(WidgetTextMath, UnparseableTextReadsAsTheFallbackValue)
 {
   RecordingWidget w;
   w.setText("not a number");
@@ -90,77 +112,53 @@ TEST(WidgetTextMath, UnparseableTextWithNoPriorValueReadsAsZero)
   EXPECT_DOUBLE_EQ(0.0, w.textDouble());
 }
 
-// The half-typed states an expression passes through while it is being
-// edited must not move the value a live preview is reading.
-TEST(WidgetTextMath, HalfTypedExpressionKeepsTheLastValueThatParsed)
+TEST(WidgetTextMath, UnparseableTextUsesTheWidgetsOwnFallback)
 {
-  RecordingWidget w;
-
-  w.setText("300");
-  EXPECT_EQ(300, w.textInt());
+  FallbackWidget w;
+  w.fallback = 300.0;
 
   w.setText("-"); // start of a negative number
   EXPECT_EQ(300, w.textInt());
-  EXPECT_EQ(1, w.errorCount);
+  EXPECT_DOUBLE_EQ(300.0, w.textDouble());
+  EXPECT_EQ(2, w.errorCount);
 
-  w.setText("-1"); // ...finished
-  EXPECT_EQ(-1, w.textInt());
-  EXPECT_EQ(1, w.errorCount);
-
-  w.setText("-1*"); // trailing operator
-  EXPECT_EQ(-1, w.textInt());
+  w.setText("-25"); // ...finished
+  EXPECT_EQ(-25, w.textInt());
+  EXPECT_EQ(2, w.errorCount);
 }
 
-TEST(WidgetTextMath, LastEvalTextTracksTheTextThatParsed)
-{
-  RecordingWidget w;
-  EXPECT_FALSE(w.hasLastEvalText());
-
-  w.setText("16*2");
-  EXPECT_EQ(32, w.textInt());
-  EXPECT_TRUE(w.hasLastEvalText());
-  EXPECT_EQ("16*2", w.lastEvalText());
-
-  // A failed evaluation leaves the known-good text alone.
-  w.setText("16*");
-  EXPECT_EQ(32, w.textInt());
-  EXPECT_EQ("16*2", w.lastEvalText());
-}
-
-// hasLastEvalText() is what tells an Entry it is a numeric field at all, so
-// it must stay false for text nothing reads as a number.
-TEST(WidgetTextMath, HasLastEvalTextStaysFalseUntilTextIsReadAsANumber)
-{
-  RecordingWidget w;
-  w.setText("123");
-  EXPECT_FALSE(w.hasLastEvalText());
-  EXPECT_EQ(123, w.textInt());
-  EXPECT_TRUE(w.hasLastEvalText());
-}
-
-// evalmath happily divides by zero, so a parseable expression can still
-// produce inf/NaN - neither is a usable value to hand a caller.
+// A result that parses but isn't a usable number falls back too. evalmath
+// rejects most division by zero itself, so this guards the rest.
 TEST(WidgetTextMath, NonFiniteResultIsTreatedAsAFailedEvaluation)
 {
-  RecordingWidget w;
-  w.setText("10");
-  EXPECT_EQ(10, w.textInt());
+  FallbackWidget w;
+  w.fallback = 10.0;
 
   w.setText("1/0");
   EXPECT_EQ(10, w.textInt());
   EXPECT_EQ(1, w.errorCount);
-  EXPECT_EQ("10", w.lastEvalText());
+
+  w.setText("0/0");
+  EXPECT_EQ(10, w.textInt());
 }
 
-// Clamping has to happen in double space; converting an out-of-range
-// double straight to an integer type is undefined behaviour.
-TEST(WidgetTextMath, HugeResultClampsWithoutUndefinedConversion)
+// isTextReadAsNumber() is what tells an Entry it is a numeric field at
+// all, so it must stay false for text nothing reads as a number.
+TEST(WidgetTextMath, IsTextReadAsNumberStaysFalseUntilTextIsReadAsANumber)
 {
   RecordingWidget w;
-  w.setText("9999999999*9999999999"); // ~1e20, past LONG_MAX
-  EXPECT_EQ(INT_MAX, w.textInt());
-  EXPECT_EQ(0, w.errorCount);
+  w.setText("123");
+  EXPECT_FALSE(w.isTextReadAsNumber());
+  EXPECT_EQ(123, w.textInt());
+  EXPECT_TRUE(w.isTextReadAsNumber());
+}
 
-  w.setText("-9999999999*9999999999");
-  EXPECT_EQ(INT_MIN, w.textInt());
+// It is set even when the read fails - the read is what makes the widget
+// numeric, not whether that particular text happened to parse.
+TEST(WidgetTextMath, IsTextReadAsNumberIsSetEvenWhenTheTextDoesNotParse)
+{
+  RecordingWidget w;
+  w.setText("-");
+  EXPECT_EQ(0, w.textInt());
+  EXPECT_TRUE(w.isTextReadAsNumber());
 }

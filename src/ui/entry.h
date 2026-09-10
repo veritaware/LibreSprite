@@ -54,13 +54,11 @@ namespace ui {
     void onPaint(PaintEvent& ev) override;
     void onSetText() override;
 
-    // Snapshot the value the user is about to edit, as the last resort for
-    // restoreLastEvalText(). Called when this entry gains focus.
-    void rememberTextForRestore();
-
     // If this entry is read as a math expression and what it currently
     // holds no longer evaluates, put back the last text that did.
-    void restoreLastEvalText();
+    void restoreLastValidText();
+
+    double onEvalFallback() const override;
 
     // New Events
     virtual void onChange();
@@ -107,9 +105,14 @@ namespace ui {
     bool m_lock_selection;
     bool m_got_focus_message;
 
-    // text() as it was when this entry last gained focus, i.e. the value
-    // the user started editing from. Used by restoreLastEvalText().
-    std::string m_textOnFocusEnter;
+    // The last text this entry held that evaluated as a math expression,
+    // and what it evaluated to. Tracked on every text change - including
+    // the one that fills the field when its window is built - so it does
+    // not depend on when, or whether, anything reads the entry.
+    std::string m_validText;
+    double m_validValue;
+    bool m_hasValidText;
+
     std::string m_suffix;
   };
 
